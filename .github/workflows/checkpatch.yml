@@ -14,5 +14,10 @@ jobs:
           touch spelling.txt
       - name: Checkpatch
         run: |
+          set -x
           git fetch origin
+          git rev-parse HEAD
+          git rev-parse origin/master
+          echo SHA: $GITHUB_SHA
+          echo REF: $GITHUB_REF
           make checkpatch CHECKPATCH=./checkpatch.pl Q=
