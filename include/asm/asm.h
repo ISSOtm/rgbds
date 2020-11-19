@@ -21,8 +21,8 @@
 #include "asm/localasm.h"
 #include "asm/symbol.h"
 
-#define MAXMACROARGS	99999
-#define MAXINCPATHS	128
+#define MAXMACROARGS 99999
+#define MAXINCPATHS 128
 
 extern uint32_t nTotalLines;
 extern uint32_t nIFDepth;

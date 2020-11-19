@@ -1,4 +1,6 @@
 
+#include "asm/section.h"
+
 #include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -10,9 +12,7 @@
 #include "asm/main.h"
 #include "asm/output.h"
 #include "asm/rpn.h"
-#include "asm/section.h"
 #include "asm/warning.h"
-
 #include "extern/err.h"
 #include "platform.h" // strdup
 
@@ -53,7 +53,7 @@ static inline void checkcodesection(void)
 
 	if (!sect_HasData(pCurrentSection->type))
 		fatalerror("Section '%s' cannot contain code or data (not ROM0 or ROMX)\n",
-			   pCurrentSection->name);
+		           pCurrentSection->name);
 }
 
 static inline void checkSectionSize(struct Section const *sect, uint32_t size)
@@ -62,7 +62,8 @@ static inline void checkSectionSize(struct Section const *sect, uint32_t size)
 
 	if (size > maxSize)
 		fatalerror("Section '%s' grew too big (max size = 0x%" PRIX32
-			   " bytes, reached 0x%" PRIX32 ").\n", sect->name, maxSize, size);
+		           " bytes, reached 0x%" PRIX32 ").\n",
+		           sect->name, maxSize, size);
 }
 
 /*
@@ -98,9 +99,8 @@ struct Section *out_FindSectionByName(const char *name)
 /*
  * Find a section by name and type. If it doesn't exist, create it
  */
-static struct Section *getSection(char const *name, enum SectionType type,
-				  uint32_t org, struct SectionSpec const *attrs,
-				  enum SectionModifier mod)
+static struct Section *getSection(char const *name, enum SectionType type, uint32_t org,
+                                  struct SectionSpec const *attrs, enum SectionModifier mod)
 {
 #define mask(align) ((1 << (align)) - 1)
 	uint32_t bank = attrs->bank;
@@ -108,19 +108,18 @@ static struct Section *getSection(char const *name, enum SectionType type,
 	uint16_t alignOffset = attrs->alignOfs;
 
 	if (bank != -1) {
-		if (type != SECTTYPE_ROMX && type != SECTTYPE_VRAM
-		 && type != SECTTYPE_SRAM && type != SECTTYPE_WRAMX)
+		if (type != SECTTYPE_ROMX && type != SECTTYPE_VRAM && type != SECTTYPE_SRAM
+		    && type != SECTTYPE_WRAMX)
 			error("BANK only allowed for ROMX, WRAMX, SRAM, or VRAM sections\n");
-		else if (bank < bankranges[type][0]
-		      || bank > bankranges[type][1])
-			error("%s bank value $%" PRIx32 " out of range ($%" PRIx32 " to $%"
-				PRIx32 ")\n", typeNames[type], bank,
-				bankranges[type][0], bankranges[type][1]);
+		else if (bank < bankranges[type][0] || bank > bankranges[type][1])
+			error("%s bank value $%" PRIx32 " out of range ($%" PRIx32 " to $%" PRIx32
+			      ")\n",
+			      typeNames[type], bank, bankranges[type][0], bankranges[type][1]);
 	}
 
 	if (alignOffset >= 1 << alignment) {
 		error("Alignment offset must not be greater than alignment (%" PRIu16 " < %u)\n",
-			alignOffset, 1U << alignment);
+		      alignOffset, 1U << alignment);
 		alignOffset = 0;
 	}
 
@@ -130,20 +129,21 @@ static struct Section *getSection(char const *name, enum SectionType type,
 
 		if (org != -1) {
 			if ((org - alignOffset) & mask)
-				error("Section \"%s\"'s fixed address doesn't match its alignment\n",
-					name);
+				error(
+				    "Section \"%s\"'s fixed address doesn't match its alignment\n",
+				    name);
 			alignment = 0; /* Ignore it if it's satisfied */
 		} else if (startaddr[type] & mask) {
-			error("Section \"%s\"'s alignment cannot be attained in %s\n",
-				name, typeNames[type]);
+			error("Section \"%s\"'s alignment cannot be attained in %s\n", name,
+			      typeNames[type]);
 		}
 	}
 
 	if (org != -1) {
 		if (org < startaddr[type] || org > endaddr(type))
 			error("Section \"%s\"'s fixed address %#" PRIx32
-				" is outside of range [%#" PRIx16 "; %#" PRIx16 "]\n",
-				name, org, startaddr[type], endaddr(type));
+			      " is outside of range [%#" PRIx16 "; %#" PRIx16 "]\n",
+			      name, org, startaddr[type], endaddr(type));
 	}
 
 	if (nbbanks(type) == 1)
@@ -153,19 +153,19 @@ static struct Section *getSection(char const *name, enum SectionType type,
 
 	if (sect) {
 		unsigned int nbSectErrors = 0;
-#define fail(...) \
-	do { \
+#define fail(...)                   \
+	do {                        \
 		error(__VA_ARGS__); \
-		nbSectErrors++; \
+		nbSectErrors++;     \
 	} while (0)
 
 		if (type != sect->type)
-			fail("Section \"%s\" already exists but with type %s\n",
-			     sect->name, typeNames[sect->type]);
+			fail("Section \"%s\" already exists but with type %s\n", sect->name,
+			     typeNames[sect->type]);
 
 		if (sect->modifier != mod)
-			fail("Section \"%s\" already declared as %s section\n",
-			     sect->name, sectionModNames[sect->modifier]);
+			fail("Section \"%s\" already declared as %s section\n", sect->name,
+			     sectionModNames[sect->modifier]);
 		/*
 		 * Normal sections need to have exactly identical constraints;
 		 * but unionized sections only need "compatible" constraints,
@@ -181,31 +181,34 @@ static struct Section *getSection(char const *name, enum SectionType type,
 			if (org != -1) {
 				/* If both are fixed, they must be the same */
 				if (sect->org != -1 && sect->org != org)
-					fail("Section \"%s\" already declared as fixed at different address $%"
-					     PRIx32 "\n",
-					     sect->name, sect->org);
+					fail(
+					    "Section \"%s\" already declared as fixed at different address $%" PRIx32
+					    "\n",
+					    sect->name, sect->org);
 				else if (sect->align != 0
-				      && (mask(sect->align)
-						& (org - sect->alignOfs)))
-					fail("Section \"%s\" already declared as aligned to %u bytes (offset %"
-					     PRIu16 ")\n", sect->name, 1U << sect->align, sect->alignOfs);
+				         && (mask(sect->align) & (org - sect->alignOfs)))
+					fail(
+					    "Section \"%s\" already declared as aligned to %u bytes (offset %" PRIu16
+					    ")\n",
+					    sect->name, 1U << sect->align, sect->alignOfs);
 				else
 					/* Otherwise, just override */
 					sect->org = org;
 			} else if (alignment != 0) {
 				/* Make sure any fixed address is compatible */
 				if (sect->org != -1) {
-					if ((sect->org - alignOffset)
-							& mask(alignment))
-						fail("Section \"%s\" already declared as fixed at incompatible address $%"
-						     PRIx32 "\n", sect->name, sect->org);
-				/* Check if alignment offsets are compatible */
+					if ((sect->org - alignOffset) & mask(alignment))
+						fail(
+						    "Section \"%s\" already declared as fixed at incompatible address $%" PRIx32
+						    "\n",
+						    sect->name, sect->org);
+					/* Check if alignment offsets are compatible */
 				} else if ((alignOffset & mask(sect->align))
-					!= (sect->alignOfs
-							& mask(alignment))) {
-					fail("Section \"%s\" already declared with incompatible %"
-					     PRIu8 "-byte alignment (offset %" PRIu16 ")\n",
-					     sect->name, sect->align, sect->alignOfs);
+				           != (sect->alignOfs & mask(alignment))) {
+					fail(
+					    "Section \"%s\" already declared with incompatible %" PRIu8
+					    "-byte alignment (offset %" PRIu16 ")\n",
+					    sect->name, sect->align, sect->alignOfs);
 				} else if (alignment > sect->align) {
 					/*
 					 * If the section is not fixed,
@@ -220,43 +223,48 @@ static struct Section *getSection(char const *name, enum SectionType type,
 				sect->bank = bank;
 			/* If both specify a bank, it must be the same one */
 			else if (bank != -1 && sect->bank != bank)
-				fail("Section \"%s\" already declared with different bank %"
-				     PRIu32 "\n", sect->name, sect->bank);
+				fail("Section \"%s\" already declared with different bank %" PRIu32
+				     "\n",
+				     sect->name, sect->bank);
 		} else { /* Section fragments are handled identically in RGBASM */
 			/* However, concaternating non-fragments will be made an error */
 			if (sect->modifier != SECTION_FRAGMENT || mod != SECTION_FRAGMENT)
 				warning(WARNING_OBSOLETE,
-					"Concatenation of non-fragment sections is deprecated\n");
+				        "Concatenation of non-fragment sections is deprecated\n");
 
 			if (org != sect->org) {
 				if (sect->org == -1)
 					fail("Section \"%s\" already declared as floating\n",
 					     sect->name);
 				else
-					fail("Section \"%s\" already declared as fixed at $%"
-					     PRIx32 "\n", sect->name, sect->org);
+					fail("Section \"%s\" already declared as fixed at $%" PRIx32
+					     "\n",
+					     sect->name, sect->org);
 			}
 			if (bank != sect->bank) {
 				if (sect->bank == -1)
 					fail("Section \"%s\" already declared as floating bank\n",
 					     sect->name);
 				else
-					fail("Section \"%s\" already declared as fixed at bank %"
-					     PRIu32 "\n", sect->name, sect->bank);
+					fail(
+					    "Section \"%s\" already declared as fixed at bank %" PRIu32
+					    "\n",
+					    sect->name, sect->bank);
 			}
 			if (alignment != sect->align) {
 				if (sect->align == 0)
 					fail("Section \"%s\" already declared as unaligned\n",
 					     sect->name);
 				else
-					fail("Section \"%s\" already declared as aligned to %u bytes\n",
-					     sect->name, 1U << sect->align);
+					fail(
+					    "Section \"%s\" already declared as aligned to %u bytes\n",
+					    sect->name, 1U << sect->align);
 			}
 		}
 
 		if (nbSectErrors)
-			fatalerror("Cannot create section \"%s\" (%u errors)\n",
-				   sect->name, nbSectErrors);
+			fatalerror("Cannot create section \"%s\" (%u errors)\n", sect->name,
+			           nbSectErrors);
 #undef fail
 		return sect;
 	}
@@ -316,7 +324,7 @@ static void changeSection(void)
  * Set the current section by name and type
  */
 void out_NewSection(char const *name, uint32_t type, uint32_t org,
-		    struct SectionSpec const *attribs, enum SectionModifier mod)
+                    struct SectionSpec const *attribs, enum SectionModifier mod)
 {
 	if (currentLoadSection)
 		fatalerror("Cannot change the section within a `LOAD` block\n");
@@ -332,7 +340,7 @@ void out_NewSection(char const *name, uint32_t type, uint32_t org,
  * Set the current section by name and type
  */
 void out_SetLoadSection(char const *name, uint32_t type, uint32_t org,
-			struct SectionSpec const *attribs)
+                        struct SectionSpec const *attribs)
 {
 	checkcodesection();
 
@@ -383,17 +391,19 @@ void sect_AlignPC(uint8_t alignment, uint16_t offset)
 
 	if (sect->org != -1) {
 		if ((sym_GetPCValue() - offset) % (1 << alignment))
-			error("Section's fixed address fails required alignment (PC = $%04"
-				PRIx32 ")\n", sym_GetPCValue());
+			error("Section's fixed address fails required alignment (PC = $%04" PRIx32
+			      ")\n",
+			      sym_GetPCValue());
 	} else if (sect->align != 0) {
-		if ((((sect->alignOfs + curOffset) % (1 << sect->align))
-						- offset) % (1 << alignment)) {
-			error("Section's alignment fails required alignment (offset from section start = $%04"
-				PRIx32 ")\n", curOffset);
+		if ((((sect->alignOfs + curOffset) % (1 << sect->align)) - offset)
+		    % (1 << alignment)) {
+			error(
+			    "Section's alignment fails required alignment (offset from section start = $%04" PRIx32
+			    ")\n",
+			    curOffset);
 		} else if (alignment > sect->align) {
 			sect->align = alignment;
-			sect->alignOfs =
-					(offset - curOffset) % (1 << alignment);
+			sect->alignOfs = (offset - curOffset) % (1 << alignment);
 		}
 	} else {
 		sect->align = alignment;
@@ -430,8 +440,7 @@ static inline void writelong(uint32_t b)
 	writebyte(b >> 24);
 }
 
-static inline void createPatch(enum PatchType type,
-			       struct Expression const *expr)
+static inline void createPatch(enum PatchType type, struct Expression const *expr)
 {
 	out_CreatePatch(type, expr, sect_GetOutputOffset());
 }
@@ -638,7 +647,7 @@ void out_PCRelByte(struct Expression *expr)
 
 		if (offset < -128 || offset > 127) {
 			error("jr target out of reach (expected -129 < %" PRId16 " < 128)\n",
-				offset);
+			      offset);
 			writebyte(0);
 		} else {
 			writebyte(offset);
@@ -689,8 +698,8 @@ void out_BinaryFile(char const *s, int32_t startPos)
 		reserveSpace(fsize - startPos);
 	} else {
 		if (errno != ESPIPE)
-			error("Error determining size of INCBIN file '%s': %s\n",
-				s, strerror(errno));
+			error("Error determining size of INCBIN file '%s': %s\n", s,
+			      strerror(errno));
 		/* The file isn't seekable, so we'll just skip bytes */
 		while (startPos--)
 			(void)fgetc(f);
@@ -758,8 +767,8 @@ void out_BinaryFileSlice(char const *s, int32_t start_pos, int32_t length)
 		fseek(f, start_pos, SEEK_SET);
 	} else {
 		if (errno != ESPIPE)
-			error("Error determining size of INCBIN file '%s': %s\n",
-				s, strerror(errno));
+			error("Error determining size of INCBIN file '%s': %s\n", s,
+			      strerror(errno));
 		/* The file isn't seekable, so we'll just skip bytes */
 		while (start_pos--)
 			(void)fgetc(f);
@@ -775,8 +784,7 @@ void out_BinaryFileSlice(char const *s, int32_t start_pos, int32_t length)
 		} else if (ferror(f)) {
 			error("Error reading INCBIN file '%s': %s\n", s, strerror(errno));
 		} else {
-			error("Premature end of file (%" PRId32 " bytes left to read)\n",
-				todo + 1);
+			error("Premature end of file (%" PRId32 " bytes left to read)\n", todo + 1);
 		}
 	}
 
@@ -792,7 +800,7 @@ void out_PushSection(void)
 	struct SectionStackEntry *sect = malloc(sizeof(*sect));
 
 	if (sect == NULL)
-		fatalerror("No memory for section stack: %s\n",  strerror(errno));
+		fatalerror("No memory for section stack: %s\n", strerror(errno));
 	sect->section = pCurrentSection;
 	sect->scope = sym_GetCurrentSymbolScope();
 	sect->offset = curOffset;

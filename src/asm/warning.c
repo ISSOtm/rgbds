@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asm/warning.h"
+
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -14,13 +16,12 @@
 
 #include "asm/fstack.h"
 #include "asm/main.h"
-#include "asm/warning.h"
-
 #include "extern/err.h"
 
 unsigned int nbErrors = 0;
 
-enum WarningState {
+enum WarningState
+{
 	WARNING_DEFAULT,
 	WARNING_DISABLED,
 	WARNING_ENABLED,
@@ -28,20 +29,20 @@ enum WarningState {
 };
 
 static enum WarningState const defaultWarnings[NB_WARNINGS] = {
-	[WARNING_ASSERT]		= WARNING_ENABLED,
-	[WARNING_BUILTIN_ARG]		= WARNING_DISABLED,
-	[WARNING_CHARMAP_REDEF]		= WARNING_DISABLED,
-	[WARNING_DIV]			= WARNING_DISABLED,
-	[WARNING_EMPTY_DATA_DIRECTIVE]	= WARNING_DISABLED,
-	[WARNING_EMPTY_ENTRY]		= WARNING_DISABLED,
-	[WARNING_LARGE_CONSTANT]	= WARNING_DISABLED,
-	[WARNING_LONG_STR]		= WARNING_DISABLED,
-	[WARNING_NESTED_COMMENT]	= WARNING_ENABLED,
-	[WARNING_OBSOLETE]		= WARNING_ENABLED,
-	[WARNING_SHIFT]			= WARNING_DISABLED,
-	[WARNING_SHIFT_AMOUNT]		= WARNING_DISABLED,
-	[WARNING_TRUNCATION]		= WARNING_ENABLED,
-	[WARNING_USER]			= WARNING_ENABLED,
+    [WARNING_ASSERT] = WARNING_ENABLED,
+    [WARNING_BUILTIN_ARG] = WARNING_DISABLED,
+    [WARNING_CHARMAP_REDEF] = WARNING_DISABLED,
+    [WARNING_DIV] = WARNING_DISABLED,
+    [WARNING_EMPTY_DATA_DIRECTIVE] = WARNING_DISABLED,
+    [WARNING_EMPTY_ENTRY] = WARNING_DISABLED,
+    [WARNING_LARGE_CONSTANT] = WARNING_DISABLED,
+    [WARNING_LONG_STR] = WARNING_DISABLED,
+    [WARNING_NESTED_COMMENT] = WARNING_ENABLED,
+    [WARNING_OBSOLETE] = WARNING_ENABLED,
+    [WARNING_SHIFT] = WARNING_DISABLED,
+    [WARNING_SHIFT_AMOUNT] = WARNING_DISABLED,
+    [WARNING_TRUNCATION] = WARNING_ENABLED,
+    [WARNING_USER] = WARNING_ENABLED,
 };
 
 static enum WarningState warningStates[NB_WARNINGS];
@@ -68,70 +69,39 @@ static enum WarningState warningState(enum WarningID id)
 }
 
 static char const *warningFlags[NB_WARNINGS_ALL] = {
-	"assert",
-	"builtin-args",
-	"charmap-redef",
-	"div",
-	"empty-data-directive",
-	"empty-entry",
-	"large-constant",
-	"long-string",
-	"nested-comment",
-	"obsolete",
-	"shift",
-	"shift-amount",
-	"truncation",
-	"user",
+    "assert", "builtin-args", "charmap-redef", "div", "empty-data-directive", "empty-entry",
+    "large-constant", "long-string", "nested-comment", "obsolete", "shift", "shift-amount",
+    "truncation", "user",
 
-	/* Meta warnings */
-	"all",
-	"extra",
-	"everything" /* Especially useful for testing */
+    /* Meta warnings */
+    "all", "extra", "everything" /* Especially useful for testing */
 };
 
-enum MetaWarningCommand {
+enum MetaWarningCommand
+{
 	META_WARNING_DONE = NB_WARNINGS
 };
 
 /* Warnings that probably indicate an error */
 static uint8_t const _wallCommands[] = {
-	WARNING_BUILTIN_ARG,
-	WARNING_CHARMAP_REDEF,
-	WARNING_EMPTY_DATA_DIRECTIVE,
-	WARNING_LARGE_CONSTANT,
-	WARNING_LONG_STR,
-	META_WARNING_DONE
-};
+    WARNING_BUILTIN_ARG,    WARNING_CHARMAP_REDEF, WARNING_EMPTY_DATA_DIRECTIVE,
+    WARNING_LARGE_CONSTANT, WARNING_LONG_STR,      META_WARNING_DONE};
 
 /* Warnings that are less likely to indicate an error */
-static uint8_t const _wextraCommands[] = {
-	WARNING_EMPTY_ENTRY,
-	WARNING_NESTED_COMMENT,
-	META_WARNING_DONE
-};
+static uint8_t const _wextraCommands[] = {WARNING_EMPTY_ENTRY, WARNING_NESTED_COMMENT,
+                                          META_WARNING_DONE};
 
 /* Literally everything. Notably useful for testing */
 static uint8_t const _weverythingCommands[] = {
-	WARNING_BUILTIN_ARG,
-	WARNING_DIV,
-	WARNING_EMPTY_DATA_DIRECTIVE,
-	WARNING_EMPTY_ENTRY,
-	WARNING_LARGE_CONSTANT,
-	WARNING_LONG_STR,
-	WARNING_NESTED_COMMENT,
-	WARNING_OBSOLETE,
-	WARNING_SHIFT,
-	WARNING_SHIFT_AMOUNT,
-	/* WARNING_TRUNCATION, */
-	/* WARNING_USER, */
-	META_WARNING_DONE
-};
+    WARNING_BUILTIN_ARG, WARNING_DIV, WARNING_EMPTY_DATA_DIRECTIVE, WARNING_EMPTY_ENTRY,
+    WARNING_LARGE_CONSTANT, WARNING_LONG_STR, WARNING_NESTED_COMMENT, WARNING_OBSOLETE,
+    WARNING_SHIFT, WARNING_SHIFT_AMOUNT,
+    /* WARNING_TRUNCATION, */
+    /* WARNING_USER, */
+    META_WARNING_DONE};
 
-static uint8_t const *metaWarningCommands[NB_META_WARNINGS] = {
-	_wallCommands,
-	_wextraCommands,
-	_weverythingCommands
-};
+static uint8_t const *metaWarningCommands[NB_META_WARNINGS] = {_wallCommands, _wextraCommands,
+                                                               _weverythingCommands};
 
 void processWarningFlag(char const *flag)
 {
@@ -143,11 +113,9 @@ void processWarningFlag(char const *flag)
 		if (!strcmp(flag, warningFlags[id])) {
 			/* We got a match! */
 			if (setError)
-				errx(1, "Cannot make meta warning \"%s\" into an error",
-				     flag);
+				errx(1, "Cannot make meta warning \"%s\" into an error", flag);
 
-			uint8_t const *ptr =
-					metaWarningCommands[id - NB_WARNINGS];
+			uint8_t const *ptr = metaWarningCommands[id - NB_WARNINGS];
 
 			for (;;) {
 				if (*ptr == META_WARNING_DONE)
@@ -178,7 +146,7 @@ void processWarningFlag(char const *flag)
 			setError = false;
 			return;
 
-		/* Otherwise, allow parsing as another flag */
+			/* Otherwise, allow parsing as another flag */
 		}
 	}
 
@@ -187,8 +155,9 @@ void processWarningFlag(char const *flag)
 	/* Check if this is a negation */
 	bool isNegation = !strncmp(flag, "no-", strlen("no-")) && !setError;
 	char const *rootFlag = isNegation ? flag + strlen("no-") : flag;
-	enum WarningState state = setError ? WARNING_ERROR :
-			isNegation ? WARNING_DISABLED : WARNING_ENABLED;
+	enum WarningState state = setError   ? WARNING_ERROR
+				: isNegation ? WARNING_DISABLED
+					     : WARNING_ENABLED;
 
 	/* Try to match the flag against a "normal" flag */
 	for (enum WarningID id = 0; id < NB_WARNINGS; id++) {
@@ -202,8 +171,8 @@ void processWarningFlag(char const *flag)
 	warnx("Unknown warning `%s`", flag);
 }
 
-void printDiag(const char *fmt, va_list args, char const *type,
-	       char const *flagfmt, char const *flag)
+void printDiag(const char *fmt, va_list args, char const *type, char const *flagfmt,
+               char const *flag)
 {
 	fputs(type, stderr);
 	fstk_DumpCurrent();

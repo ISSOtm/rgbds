@@ -14,7 +14,6 @@
 
 #include "extern/err.h"
 #include "extern/getopt.h"
-
 #include "version.h"
 
 /* Short options */
@@ -31,39 +30,29 @@ static char const *optstring = "Ccf:i:jk:l:m:n:p:r:st:Vv";
  * over short opt matching
  */
 static struct option const longopts[] = {
-	{ "color-only",       no_argument,       NULL, 'C' },
-	{ "color-compatible", no_argument,       NULL, 'c' },
-	{ "fix-spec",         required_argument, NULL, 'f' },
-	{ "game-id",          required_argument, NULL, 'i' },
-	{ "non-japanese",     no_argument,       NULL, 'j' },
-	{ "new-licensee",     required_argument, NULL, 'k' },
-	{ "old-licensee",     required_argument, NULL, 'l' },
-	{ "mbc-type",         required_argument, NULL, 'm' },
-	{ "rom-version",      required_argument, NULL, 'n' },
-	{ "pad-value",        required_argument, NULL, 'p' },
-	{ "ram-size",         required_argument, NULL, 'r' },
-	{ "sgb-compatible",   no_argument,       NULL, 's' },
-	{ "title",            required_argument, NULL, 't' },
-	{ "version",          no_argument,       NULL, 'V' },
-	{ "validate",         no_argument,       NULL, 'v' },
-	{ NULL,               no_argument,       NULL, 0   }
-};
+    {"color-only", no_argument, NULL, 'C'},         {"color-compatible", no_argument, NULL, 'c'},
+    {"fix-spec", required_argument, NULL, 'f'},     {"game-id", required_argument, NULL, 'i'},
+    {"non-japanese", no_argument, NULL, 'j'},       {"new-licensee", required_argument, NULL, 'k'},
+    {"old-licensee", required_argument, NULL, 'l'}, {"mbc-type", required_argument, NULL, 'm'},
+    {"rom-version", required_argument, NULL, 'n'},  {"pad-value", required_argument, NULL, 'p'},
+    {"ram-size", required_argument, NULL, 'r'},     {"sgb-compatible", no_argument, NULL, 's'},
+    {"title", required_argument, NULL, 't'},        {"version", no_argument, NULL, 'V'},
+    {"validate", no_argument, NULL, 'v'},           {NULL, no_argument, NULL, 0}};
 
 static void print_usage(void)
 {
-	fputs(
-"Usage: rgbfix [-jsVv] [-C | -c] [-f <fix_spec>] [-i <game_id>] [-k <licensee>]\n"
-"              [-l <licensee_byte>] [-m <mbc_type>] [-n <rom_version>]\n"
-"              [-p <pad_value>] [-r <ram_size>] [-t <title_str>] <file>\n"
-"Useful options:\n"
-"    -m, --mbc-type <value>      set the MBC type byte to this value; refer\n"
-"                                  to the man page for a list of values\n"
-"    -p, --pad-value <value>     pad to the next valid size using this value\n"
-"    -r, --ram-size <code>       set the cart RAM size byte to this value\n"
-"    -V, --version               print RGBFIX version and exit\n"
-"    -v, --validate              fix the header logo and both checksums (-f lhg)\n"
-"\n"
-"For help, use `man rgbfix' or go to https://rgbds.gbdev.io/docs/\n",
+	fputs("Usage: rgbfix [-jsVv] [-C | -c] [-f <fix_spec>] [-i <game_id>] [-k <licensee>]\n"
+	      "              [-l <licensee_byte>] [-m <mbc_type>] [-n <rom_version>]\n"
+	      "              [-p <pad_value>] [-r <ram_size>] [-t <title_str>] <file>\n"
+	      "Useful options:\n"
+	      "    -m, --mbc-type <value>      set the MBC type byte to this value; refer\n"
+	      "                                  to the man page for a list of values\n"
+	      "    -p, --pad-value <value>     pad to the next valid size using this value\n"
+	      "    -r, --ram-size <code>       set the cart RAM size byte to this value\n"
+	      "    -V, --version               print RGBFIX version and exit\n"
+	      "    -v, --validate              fix the header logo and both checksums (-f lhg)\n"
+	      "\n"
+	      "For help, use `man rgbfix' or go to https://rgbds.gbdev.io/docs/\n",
 	      stderr);
 	exit(1);
 }
@@ -98,8 +87,8 @@ int main(int argc, char *argv[])
 	bool resize = false;
 	bool setversion = false;
 
-	char *title = NULL; /* game title in ASCII */
-	char *id = NULL; /* game ID in ASCII */
+	char *title = NULL;       /* game title in ASCII */
+	char *id = NULL;          /* game ID in ASCII */
 	char *newlicensee = NULL; /* new licensee ID, two ASCII characters */
 
 	int licensee = 0;  /* old licensee ID */
@@ -108,8 +97,7 @@ int main(int argc, char *argv[])
 	int version = 0;   /* mask ROM version number */
 	int padvalue = 0;  /* to pad the rom with if it changes size */
 
-	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts,
-					   NULL)) != -1) {
+	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'C':
 			coloronly = true;
@@ -129,8 +117,7 @@ int main(int argc, char *argv[])
 			setid = true;
 
 			if (strlen(optarg) != 4)
-				errx(1, "Game ID %s must be exactly 4 characters",
-				     optarg);
+				errx(1, "Game ID %s must be exactly 4 characters", optarg);
 
 			id = optarg;
 			break;
@@ -141,8 +128,10 @@ int main(int argc, char *argv[])
 			setnewlicensee = true;
 
 			if (strlen(optarg) != 2)
-				errx(1, "New licensee code %s is not the correct length of 2 characters",
-				     optarg);
+				errx(
+				    1,
+				    "New licensee code %s is not the correct length of 2 characters",
+				    optarg);
 
 			newlicensee = optarg;
 			break;
@@ -215,8 +204,9 @@ int main(int argc, char *argv[])
 				     optarg);
 
 			if (strlen(optarg) == 16)
-				warnx("Title \"%s\" is 16 chars, it is best to keep it to 15 or fewer",
-				      optarg);
+				warnx(
+				    "Title \"%s\" is 16 chars, it is best to keep it to 15 or fewer",
+				    optarg);
 
 			title = optarg;
 			break;
@@ -261,8 +251,7 @@ int main(int argc, char *argv[])
 
 	if (fseek(rom, 0x100, SEEK_SET) != 0)
 		err(1, "Could not locate ROM header");
-	if (fread(header, sizeof(uint8_t), sizeof(header), rom)
-	    != sizeof(header))
+	if (fread(header, sizeof(uint8_t), sizeof(header), rom) != sizeof(header))
 		err(1, "Could not read ROM header");
 
 	if (fixlogo || trashlogo) {
@@ -278,14 +267,11 @@ int main(int argc, char *argv[])
 		 * as well when requested with the -f flag.
 		 */
 
-		uint8_t ninlogo[48] = {
-			0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
-			0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
-			0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
-			0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
-			0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
-			0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
-		};
+		uint8_t ninlogo[48] = {0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73,
+		                       0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F,
+		                       0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD,
+		                       0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+		                       0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E};
 
 		if (trashlogo) {
 			for (int i = 0; i < sizeof(ninlogo); i++)
@@ -502,8 +488,7 @@ int main(int argc, char *argv[])
 	if (fseek(rom, 0x100, SEEK_SET) != 0)
 		err(1, "Could not locate header for writing");
 
-	if (fwrite(header, sizeof(uint8_t), sizeof(header), rom)
-	    != sizeof(header))
+	if (fwrite(header, sizeof(uint8_t), sizeof(header), rom) != sizeof(header))
 		err(1, "Could not write modified ROM header");
 
 	if (fixglobalsum || trashglobalsum) {

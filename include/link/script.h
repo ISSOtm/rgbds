@@ -11,8 +11,9 @@
 #define RGBDS_LINK_SCRIPT_H
 
 #include <stdint.h>
+#include <stdio.h>
 
-extern FILE * linkerScript;
+extern FILE *linkerScript;
 
 struct SectionPlacement {
 	struct Section *section;

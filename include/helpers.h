@@ -17,19 +17,19 @@
 // Ideally, we'd use `__has_attribute` and `__has_builtin`, but these were only introduced in GCC 9
 #ifdef __GNUC__ // GCC or compatible
 	#define format_(archetype, str_index, first_arg) \
-		__attribute__ ((format (archetype, str_index, first_arg)))
+		__attribute__((format(archetype, str_index, first_arg)))
 	// In release builds, define "unreachable" as such, but trap in debug builds
 	#ifdef NDEBUG
-		#define unreachable_	__builtin_unreachable
+		#define unreachable_ __builtin_unreachable
 	#else
-		#define unreachable_	__builtin_trap
+		#define unreachable_ __builtin_trap
 	#endif
 #else
 	// Unsupported, but no need to throw a fit
 	#define format_(archetype, str_index, first_arg)
-	// This seems to generate similar code to __builtin_unreachable, despite different semantics
-	// Note that executing this is undefined behavior (declared _Noreturn, but does return)
-	static inline _Noreturn unreachable_(void) {}
+// This seems to generate similar code to __builtin_unreachable, despite different semantics
+// Note that executing this is undefined behavior (declared _Noreturn, but does return)
+static inline _Noreturn unreachable_(void) {}
 #endif
 
 // Macros for stringification

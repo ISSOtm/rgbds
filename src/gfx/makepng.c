@@ -6,25 +6,22 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "gfx/makepng.h"
+
 #include <png.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "gfx/makepng.h"
-
-static void initialize_png(struct PNGImage *img, FILE * f);
+static void initialize_png(struct PNGImage *img, FILE *f);
 static struct RawIndexedImage *indexed_png_to_raw(struct PNGImage *img);
 static struct RawIndexedImage *grayscale_png_to_raw(struct PNGImage *img);
 static struct RawIndexedImage *truecolor_png_to_raw(struct PNGImage *img);
-static void get_text(const struct PNGImage *img,
-		     struct ImageOptions *png_options);
-static void set_text(const struct PNGImage *img,
-		     const struct ImageOptions *png_options);
+static void get_text(const struct PNGImage *img, struct ImageOptions *png_options);
+static void set_text(const struct PNGImage *img, const struct ImageOptions *png_options);
 static void free_png_data(const struct PNGImage *png);
 
-struct RawIndexedImage *input_png_file(const struct Options *opts,
-				       struct ImageOptions *png_options)
+struct RawIndexedImage *input_png_file(const struct Options *opts, struct ImageOptions *png_options)
 {
 	struct PNGImage img;
 	struct RawIndexedImage *raw_image;
@@ -38,20 +35,22 @@ struct RawIndexedImage *input_png_file(const struct Options *opts,
 
 	if (img.depth != depth) {
 		if (opts->verbose) {
-			warnx("Image bit depth is not %d (is %d).",
-			      depth, img.depth);
+			warnx("Image bit depth is not %d (is %d).", depth, img.depth);
 		}
 	}
 
 	switch (img.type) {
 	case PNG_COLOR_TYPE_PALETTE:
-		raw_image = indexed_png_to_raw(&img); break;
+		raw_image = indexed_png_to_raw(&img);
+		break;
 	case PNG_COLOR_TYPE_GRAY:
 	case PNG_COLOR_TYPE_GRAY_ALPHA:
-		raw_image = grayscale_png_to_raw(&img); break;
+		raw_image = grayscale_png_to_raw(&img);
+		break;
 	case PNG_COLOR_TYPE_RGB:
 	case PNG_COLOR_TYPE_RGB_ALPHA:
-		raw_image = truecolor_png_to_raw(&img); break;
+		raw_image = truecolor_png_to_raw(&img);
+		break;
 	default:
 		/* Shouldn't happen, but might as well handle just in case. */
 		errx(1, "Input PNG file is of invalid color type.");
@@ -66,9 +65,8 @@ struct RawIndexedImage *input_png_file(const struct Options *opts,
 	return raw_image;
 }
 
-void output_png_file(const struct Options *opts,
-		     const struct ImageOptions *png_options,
-		     const struct RawIndexedImage *raw_image)
+void output_png_file(const struct Options *opts, const struct ImageOptions *png_options,
+                     const struct RawIndexedImage *raw_image)
 {
 	FILE *f;
 	char *outfile;
@@ -83,8 +81,7 @@ void output_png_file(const struct Options *opts,
 	if (opts->debug) {
 		outfile = malloc(strlen(opts->infile) + 5);
 		if (!outfile)
-			err(1, "%s: Failed to allocate memory for outfile",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for outfile", __func__);
 		strcpy(outfile, opts->infile);
 		strcat(outfile, ".out");
 	} else {
@@ -95,8 +92,7 @@ void output_png_file(const struct Options *opts,
 	if (!f)
 		err(1, "Opening output png file '%s' failed", outfile);
 
-	img.png = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-					  NULL, NULL, NULL);
+	img.png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (!img.png)
 		errx(1, "Creating png structure failed");
 
@@ -109,18 +105,17 @@ void output_png_file(const struct Options *opts,
 
 	png_init_io(img.png, f);
 
-	png_set_IHDR(img.png, img.info, raw_image->width, raw_image->height,
-		     8, PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE,
-		     PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+	png_set_IHDR(img.png, img.info, raw_image->width, raw_image->height, 8,
+	             PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+	             PNG_FILTER_TYPE_DEFAULT);
 
 	png_palette = malloc(sizeof(*png_palette) * raw_image->num_colors);
 	if (!png_palette)
-		err(1, "%s: Failed to allocate memory for PNG palette",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for PNG palette", __func__);
 	for (i = 0; i < raw_image->num_colors; i++) {
-		png_palette[i].red   = raw_image->palette[i].red;
+		png_palette[i].red = raw_image->palette[i].red;
 		png_palette[i].green = raw_image->palette[i].green;
-		png_palette[i].blue  = raw_image->palette[i].blue;
+		png_palette[i].blue = raw_image->palette[i].blue;
 	}
 	png_set_PLTE(img.png, img.info, png_palette, raw_image->num_colors);
 	free(png_palette);
@@ -130,7 +125,7 @@ void output_png_file(const struct Options *opts,
 
 	png_write_info(img.png, img.info);
 
-	png_write_image(img.png, (png_byte **) raw_image->data);
+	png_write_image(img.png, (png_byte **)raw_image->data);
 	png_write_end(img.png, NULL);
 
 	png_destroy_write_struct(&img.png, &img.info);
@@ -156,8 +151,7 @@ void destroy_raw_image(struct RawIndexedImage **raw_image_ptr_ptr)
 
 static void initialize_png(struct PNGImage *img, FILE *f)
 {
-	img->png = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-					  NULL, NULL, NULL);
+	img->png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (!img->png)
 		errx(1, "Creating png structure failed");
 
@@ -172,17 +166,16 @@ static void initialize_png(struct PNGImage *img, FILE *f)
 
 	png_read_info(img->png, img->info);
 
-	img->width  = png_get_image_width(img->png, img->info);
+	img->width = png_get_image_width(img->png, img->info);
 	img->height = png_get_image_height(img->png, img->info);
-	img->depth  = png_get_bit_depth(img->png, img->info);
-	img->type   = png_get_color_type(img->png, img->info);
+	img->depth = png_get_bit_depth(img->png, img->info);
+	img->type = png_get_color_type(img->png, img->info);
 }
 
 static void read_png(struct PNGImage *img);
-static struct RawIndexedImage *create_raw_image(int width, int height,
-						int num_colors);
-static void set_raw_image_palette(struct RawIndexedImage *raw_image,
-				  const png_color *palette, int num_colors);
+static struct RawIndexedImage *create_raw_image(int width, int height, int num_colors);
+static void set_raw_image_palette(struct RawIndexedImage *raw_image, const png_color *palette,
+                                  int num_colors);
 
 static struct RawIndexedImage *indexed_png_to_raw(struct PNGImage *img)
 {
@@ -210,27 +203,22 @@ static struct RawIndexedImage *indexed_png_to_raw(struct PNGImage *img)
 	 * This way, an indexed PNG can contain transparent pixels in *addition*
 	 * to 4 normal colors.
 	 */
-	if (png_get_tRNS(img->png, img->info, &trans_alpha, &num_trans,
-			 &trans_color)) {
+	if (png_get_tRNS(img->png, img->info, &trans_alpha, &num_trans, &trans_color)) {
 		original_palette = palette;
 		palette = malloc(sizeof(*palette) * colors_in_PLTE);
 		if (!palette)
-			err(1, "%s: Failed to allocate memory for palette",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for palette", __func__);
 		colors_in_new_palette = 0;
-		old_to_new_palette = malloc(sizeof(*old_to_new_palette)
-					    * colors_in_PLTE);
+		old_to_new_palette = malloc(sizeof(*old_to_new_palette) * colors_in_PLTE);
 		if (!old_to_new_palette)
-			err(1, "%s: Failed to allocate memory for new palette",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for new palette", __func__);
 
 		for (i = 0; i < num_trans; i++) {
 			if (trans_alpha[i] == 0) {
 				old_to_new_palette[i] = 0;
 			} else {
 				old_to_new_palette[i] = colors_in_new_palette;
-				palette[colors_in_new_palette++] =
-					original_palette[i];
+				palette[colors_in_new_palette++] = original_palette[i];
 			}
 		}
 		for (i = num_trans; i < colors_in_PLTE; i++) {
@@ -239,12 +227,9 @@ static struct RawIndexedImage *indexed_png_to_raw(struct PNGImage *img)
 		}
 
 		if (colors_in_new_palette != colors_in_PLTE) {
-			palette = realloc(palette,
-					  sizeof(*palette) *
-					  colors_in_new_palette);
+			palette = realloc(palette, sizeof(*palette) * colors_in_new_palette);
 			if (!palette)
-				err(1, "%s: Failed to allocate memory for palette",
-				    __func__);
+				err(1, "%s: Failed to allocate memory for palette", __func__);
 		}
 
 		/*
@@ -252,14 +237,12 @@ static struct RawIndexedImage *indexed_png_to_raw(struct PNGImage *img)
 		 * allows us to error out *before* doing the data
 		 * transformation if the palette is too long.
 		 */
-		set_raw_image_palette(raw_image, palette,
-				      colors_in_new_palette);
+		set_raw_image_palette(raw_image, palette, colors_in_new_palette);
 		read_png(img);
 
 		for (y = 0; y < img->height; y++) {
 			for (x = 0; x < img->width; x++) {
-				raw_image->data[y][x] =
-					old_to_new_palette[img->data[y][x]];
+				raw_image->data[y][x] = old_to_new_palette[img->data[y][x]];
 			}
 		}
 
@@ -287,12 +270,10 @@ static struct RawIndexedImage *grayscale_png_to_raw(struct PNGImage *img)
 	return truecolor_png_to_raw(img);
 }
 
-static void rgba_png_palette(struct PNGImage *img,
-			     png_color **palette_ptr_ptr, int *num_colors);
-static struct RawIndexedImage
-	*processed_rgba_png_to_raw(const struct PNGImage *img,
-				   const png_color *palette,
-				   int colors_in_palette);
+static void rgba_png_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors);
+static struct RawIndexedImage *processed_rgba_png_to_raw(const struct PNGImage *img,
+                                                         const png_color *palette,
+                                                         int colors_in_palette);
 
 static struct RawIndexedImage *truecolor_png_to_raw(struct PNGImage *img)
 {
@@ -325,13 +306,10 @@ static struct RawIndexedImage *truecolor_png_to_raw(struct PNGImage *img)
 	return raw_image;
 }
 
-static void rgba_PLTE_palette(struct PNGImage *img,
-			      png_color **palette_ptr_ptr, int *num_colors);
-static void rgba_build_palette(struct PNGImage *img,
-			       png_color **palette_ptr_ptr, int *num_colors);
+static void rgba_PLTE_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors);
+static void rgba_build_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors);
 
-static void rgba_png_palette(struct PNGImage *img,
-			     png_color **palette_ptr_ptr, int *num_colors)
+static void rgba_png_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors)
 {
 	if (png_get_valid(img->png, img->info, PNG_INFO_PLTE))
 		rgba_PLTE_palette(img, palette_ptr_ptr, num_colors);
@@ -339,26 +317,22 @@ static void rgba_png_palette(struct PNGImage *img,
 		rgba_build_palette(img, palette_ptr_ptr, num_colors);
 }
 
-static void rgba_PLTE_palette(struct PNGImage *img,
-			      png_color **palette_ptr_ptr, int *num_colors)
+static void rgba_PLTE_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors)
 {
 	png_get_PLTE(img->png, img->info, palette_ptr_ptr, num_colors);
 	/*
 	 * Lets us free the palette manually instead of leaving it to libpng,
 	 * which lets us handle a PLTE and a built palette the same way.
 	 */
-	png_data_freer(img->png, img->info,
-		       PNG_USER_WILL_FREE_DATA, PNG_FREE_PLTE);
+	png_data_freer(img->png, img->info, PNG_USER_WILL_FREE_DATA, PNG_FREE_PLTE);
 }
 
-static void update_built_palette(png_color *palette,
-				 const png_color *pixel_color, png_byte alpha,
-				 int *num_colors, bool *only_grayscale);
+static void update_built_palette(png_color *palette, const png_color *pixel_color, png_byte alpha,
+                                 int *num_colors, bool *only_grayscale);
 static int fit_grayscale_palette(png_color *palette, int *num_colors);
 static void order_color_palette(png_color *palette, int num_colors);
 
-static void rgba_build_palette(struct PNGImage *img,
-			       png_color **palette_ptr_ptr, int *num_colors)
+static void rgba_build_palette(struct PNGImage *img, png_color **palette_ptr_ptr, int *num_colors)
 {
 	png_color *palette;
 	int y, value_index;
@@ -379,14 +353,13 @@ static void rgba_build_palette(struct PNGImage *img,
 	for (y = 0; y < img->height; y++) {
 		value_index = 0;
 		while (value_index < img->width * 4) {
-			cur_pixel_color.red   = img->data[y][value_index++];
+			cur_pixel_color.red = img->data[y][value_index++];
 			cur_pixel_color.green = img->data[y][value_index++];
-			cur_pixel_color.blue  = img->data[y][value_index++];
+			cur_pixel_color.blue = img->data[y][value_index++];
 			cur_alpha = img->data[y][value_index++];
 
-			update_built_palette(palette, &cur_pixel_color,
-					     cur_alpha,
-					     num_colors, &only_grayscale);
+			update_built_palette(palette, &cur_pixel_color, cur_alpha, num_colors,
+			                     &only_grayscale);
 		}
 	}
 
@@ -397,9 +370,8 @@ static void rgba_build_palette(struct PNGImage *img,
 		order_color_palette(palette, *num_colors);
 }
 
-static void update_built_palette(png_color *palette,
-				 const png_color *pixel_color, png_byte alpha,
-				 int *num_colors, bool *only_grayscale)
+static void update_built_palette(png_color *palette, const png_color *pixel_color, png_byte alpha,
+                                 int *num_colors, bool *only_grayscale)
 {
 	bool color_exists;
 	png_color cur_palette_color;
@@ -412,25 +384,27 @@ static void update_built_palette(png_color *palette,
 	if (alpha == 0)
 		return;
 
-	if (*only_grayscale && !(pixel_color->red == pixel_color->green &&
-				 pixel_color->red == pixel_color->blue)) {
+	if (*only_grayscale
+	    && !(pixel_color->red == pixel_color->green && pixel_color->red == pixel_color->blue)) {
 		*only_grayscale = false;
 	}
 
 	color_exists = false;
 	for (i = 0; i < *num_colors; i++) {
 		cur_palette_color = palette[i];
-		if (pixel_color->red   == cur_palette_color.red   &&
-		    pixel_color->green == cur_palette_color.green &&
-		    pixel_color->blue  == cur_palette_color.blue) {
+		if (pixel_color->red == cur_palette_color.red
+		    && pixel_color->green == cur_palette_color.green
+		    && pixel_color->blue == cur_palette_color.blue) {
 			color_exists = true;
 			break;
 		}
 	}
 	if (!color_exists) {
 		if (*num_colors == colors) {
-			errx(1, "Too many colors in input PNG file to fit into a %d-bit palette (max %d).",
-			     depth, colors);
+			errx(
+			    1,
+			    "Too many colors in input PNG file to fit into a %d-bit palette (max %d).",
+			    depth, colors);
 		}
 		palette[*num_colors] = *pixel_color;
 		(*num_colors)++;
@@ -449,19 +423,19 @@ static int fit_grayscale_palette(png_color *palette, int *num_colors)
 	if (!set_indices)
 		err(1, "%s: Failed to allocate memory for indices", __func__);
 
-	fitted_palette[0].red   = 0xFF;
+	fitted_palette[0].red = 0xFF;
 	fitted_palette[0].green = 0xFF;
-	fitted_palette[0].blue  = 0xFF;
-	fitted_palette[colors - 1].red   = 0;
+	fitted_palette[0].blue = 0xFF;
+	fitted_palette[colors - 1].red = 0;
 	fitted_palette[colors - 1].green = 0;
-	fitted_palette[colors - 1].blue  = 0;
+	fitted_palette[colors - 1].blue = 0;
 	if (colors == 4) {
-		fitted_palette[1].red   = 0xA9;
+		fitted_palette[1].red = 0xA9;
 		fitted_palette[1].green = 0xA9;
-		fitted_palette[1].blue  = 0xA9;
-		fitted_palette[2].red   = 0x55;
+		fitted_palette[1].blue = 0xA9;
+		fitted_palette[2].red = 0x55;
 		fitted_palette[2].green = 0x55;
-		fitted_palette[2].blue  = 0x55;
+		fitted_palette[2].blue = 0x55;
 	}
 
 	for (i = 0; i < *num_colors; i++) {
@@ -505,7 +479,7 @@ static void order_color_palette(png_color *palette, int num_colors)
 {
 	int i;
 	struct ColorWithLuminance *palette_with_luminance =
-		malloc(sizeof(*palette_with_luminance) * num_colors);
+	    malloc(sizeof(*palette_with_luminance) * num_colors);
 
 	if (!palette_with_luminance)
 		err(1, "%s: Failed to allocate memory for palette", __func__);
@@ -516,28 +490,24 @@ static void order_color_palette(png_color *palette, int num_colors)
 		 * used for comparison, we might as well use integer math.
 		 */
 		palette_with_luminance[i].color = palette[i];
-		palette_with_luminance[i].luminance = 2126 * palette[i].red   +
-						      7152 * palette[i].green +
-						       722 * palette[i].blue;
+		palette_with_luminance[i].luminance =
+		    2126 * palette[i].red + 7152 * palette[i].green + 722 * palette[i].blue;
 	}
-	qsort(palette_with_luminance, num_colors,
-	      sizeof(*palette_with_luminance), compare_luminance);
+	qsort(palette_with_luminance, num_colors, sizeof(*palette_with_luminance),
+	      compare_luminance);
 	for (i = 0; i < num_colors; i++)
 		palette[i] = palette_with_luminance[i].color;
 
 	free(palette_with_luminance);
 }
 
-static void put_raw_image_pixel(struct RawIndexedImage *raw_image,
-				const struct PNGImage *img,
-				int *value_index, int x, int y,
-				const png_color *palette,
-				int colors_in_palette);
+static void put_raw_image_pixel(struct RawIndexedImage *raw_image, const struct PNGImage *img,
+                                int *value_index, int x, int y, const png_color *palette,
+                                int colors_in_palette);
 
-static struct RawIndexedImage
-	*processed_rgba_png_to_raw(const struct PNGImage *img,
-				   const png_color *palette,
-				   int colors_in_palette)
+static struct RawIndexedImage *processed_rgba_png_to_raw(const struct PNGImage *img,
+                                                         const png_color *palette,
+                                                         int colors_in_palette)
 {
 	struct RawIndexedImage *raw_image;
 	int x, y, value_index;
@@ -551,9 +521,8 @@ static struct RawIndexedImage
 		value_index = img->width * 4 - 1;
 
 		while (x >= 0) {
-			put_raw_image_pixel(raw_image, img,
-					    &value_index, x, y,
-					    palette, colors_in_palette);
+			put_raw_image_pixel(raw_image, img, &value_index, x, y, palette,
+			                    colors_in_palette);
 			x--;
 		}
 	}
@@ -561,14 +530,11 @@ static struct RawIndexedImage
 	return raw_image;
 }
 
-static uint8_t palette_index_of(const png_color *palette,
-				int num_colors, const png_color *color);
+static uint8_t palette_index_of(const png_color *palette, int num_colors, const png_color *color);
 
-static void put_raw_image_pixel(struct RawIndexedImage *raw_image,
-				const struct PNGImage *img,
-				int *value_index, int x, int y,
-				const png_color *palette,
-				int colors_in_palette)
+static void put_raw_image_pixel(struct RawIndexedImage *raw_image, const struct PNGImage *img,
+                                int *value_index, int x, int y, const png_color *palette,
+                                int colors_in_palette)
 {
 	png_color pixel_color;
 	png_byte alpha;
@@ -579,24 +545,20 @@ static void put_raw_image_pixel(struct RawIndexedImage *raw_image,
 		*value_index -= 4;
 	} else {
 		(*value_index)--;
-		pixel_color.blue  = img->data[y][(*value_index)--];
+		pixel_color.blue = img->data[y][(*value_index)--];
 		pixel_color.green = img->data[y][(*value_index)--];
-		pixel_color.red   = img->data[y][(*value_index)--];
-		raw_image->data[y][x] = palette_index_of(palette,
-							 colors_in_palette,
-							 &pixel_color);
+		pixel_color.red = img->data[y][(*value_index)--];
+		raw_image->data[y][x] = palette_index_of(palette, colors_in_palette, &pixel_color);
 	}
 }
 
-static uint8_t palette_index_of(const png_color *palette,
-				int num_colors, const png_color *color)
+static uint8_t palette_index_of(const png_color *palette, int num_colors, const png_color *color)
 {
 	uint8_t i;
 
 	for (i = 0; i < num_colors; i++) {
-		if (palette[i].red   == color->red   &&
-		    palette[i].green == color->green &&
-		    palette[i].blue  == color->blue) {
+		if (palette[i].red == color->red && palette[i].green == color->green
+		    && palette[i].blue == color->blue) {
 			return i;
 		}
 	}
@@ -611,29 +573,25 @@ static void read_png(struct PNGImage *img)
 
 	img->data = malloc(sizeof(*img->data) * img->height);
 	if (!img->data)
-		err(1, "%s: Failed to allocate memory for image data",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for image data", __func__);
 	for (y = 0; y < img->height; y++) {
 		img->data[y] = malloc(png_get_rowbytes(img->png, img->info));
 		if (!img->data[y])
-			err(1, "%s: Failed to allocate memory for image data",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for image data", __func__);
 	}
 
 	png_read_image(img->png, img->data);
 	png_read_end(img->png, img->info);
 }
 
-static struct RawIndexedImage *create_raw_image(int width, int height,
-						int num_colors)
+static struct RawIndexedImage *create_raw_image(int width, int height, int num_colors)
 {
 	struct RawIndexedImage *raw_image;
 	int y;
 
 	raw_image = malloc(sizeof(*raw_image));
 	if (!raw_image)
-		err(1, "%s: Failed to allocate memory for raw image",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for raw image", __func__);
 
 	raw_image->width = width;
 	raw_image->height = height;
@@ -641,49 +599,45 @@ static struct RawIndexedImage *create_raw_image(int width, int height,
 
 	raw_image->palette = malloc(sizeof(*raw_image->palette) * num_colors);
 	if (!raw_image->palette)
-		err(1, "%s: Failed to allocate memory for raw image palette",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for raw image palette", __func__);
 
 	raw_image->data = malloc(sizeof(*raw_image->data) * height);
 	if (!raw_image->data)
-		err(1, "%s: Failed to allocate memory for raw image data",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for raw image data", __func__);
 	for (y = 0; y < height; y++) {
-		raw_image->data[y] = malloc(sizeof(*raw_image->data[y])
-					    * width);
+		raw_image->data[y] = malloc(sizeof(*raw_image->data[y]) * width);
 		if (!raw_image->data[y])
-			err(1, "%s: Failed to allocate memory for raw image data",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for raw image data", __func__);
 	}
 
 	return raw_image;
 }
 
-static void set_raw_image_palette(struct RawIndexedImage *raw_image,
-				  const png_color *palette, int num_colors)
+static void set_raw_image_palette(struct RawIndexedImage *raw_image, const png_color *palette,
+                                  int num_colors)
 {
 	int i;
 
 	if (num_colors > raw_image->num_colors) {
-		errx(1, "Too many colors in input PNG file's palette to fit into a %d-bit palette (%d in input palette, max %d).",
-		     raw_image->num_colors >> 1,
-		     num_colors, raw_image->num_colors);
+		errx(
+		    1,
+		    "Too many colors in input PNG file's palette to fit into a %d-bit palette (%d in input palette, max %d).",
+		    raw_image->num_colors >> 1, num_colors, raw_image->num_colors);
 	}
 
 	for (i = 0; i < num_colors; i++) {
-		raw_image->palette[i].red   = palette[i].red;
+		raw_image->palette[i].red = palette[i].red;
 		raw_image->palette[i].green = palette[i].green;
-		raw_image->palette[i].blue  = palette[i].blue;
+		raw_image->palette[i].blue = palette[i].blue;
 	}
 	for (i = num_colors; i < raw_image->num_colors; i++) {
-		raw_image->palette[i].red   = 0;
+		raw_image->palette[i].red = 0;
 		raw_image->palette[i].green = 0;
-		raw_image->palette[i].blue  = 0;
+		raw_image->palette[i].blue = 0;
 	}
 }
 
-static void get_text(const struct PNGImage *img,
-		     struct ImageOptions *png_options)
+static void get_text(const struct PNGImage *img, struct ImageOptions *png_options)
 {
 	png_text *text;
 	int i, numtxts, numremoved;
@@ -732,16 +686,14 @@ static void get_text(const struct PNGImage *img,
 	png_set_text(img->png, img->info, text, numtxts - numremoved);
 }
 
-static void set_text(const struct PNGImage *img,
-		     const struct ImageOptions *png_options)
+static void set_text(const struct PNGImage *img, const struct ImageOptions *png_options)
 {
 	png_text *text;
 	char buffer[3];
 
 	text = malloc(sizeof(*text));
 	if (!text)
-		err(1, "%s: Failed to allocate memory for PNG text",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for PNG text", __func__);
 
 	if (png_options->horizontal) {
 		text[0].key = "h";

@@ -6,16 +6,16 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "link/symbol.h"
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "link/object.h"
-#include "link/symbol.h"
-#include "link/main.h"
-
 #include "extern/err.h"
 #include "hashmap.h"
+#include "link/main.h"
+#include "link/object.h"
 
 HashMap symbols;
 
@@ -33,7 +33,7 @@ static void forEach(void *symbol, void *arg)
 
 void sym_ForEach(void (*callback)(struct Symbol *, void *), void *arg)
 {
-	struct ForEachArg callbackArg = { .callback = callback, .arg = arg};
+	struct ForEachArg callbackArg = {.callback = callback, .arg = arg};
 
 	hash_ForEach(symbols, forEach, &callbackArg);
 }
@@ -44,10 +44,11 @@ void sym_AddSymbol(struct Symbol *symbol)
 	struct Symbol *other = hash_GetElement(symbols, symbol->name);
 
 	if (other) {
-		fprintf(stderr, "error: \"%s\" both in %s from ", symbol->name, symbol->objFileName);
+		fprintf(stderr, "error: \"%s\" both in %s from ", symbol->name,
+		        symbol->objFileName);
 		dumpFileStack(symbol->src);
-		fprintf(stderr, "(%" PRIu32 ") and in %s from ",
-			symbol->lineNo, other->objFileName);
+		fprintf(stderr, "(%" PRIu32 ") and in %s from ", symbol->lineNo,
+		        other->objFileName);
 		dumpFileStack(other->src);
 		fprintf(stderr, "(%" PRIu32 ")\n", other->lineNo);
 		exit(1);

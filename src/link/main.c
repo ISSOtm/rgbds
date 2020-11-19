@@ -6,38 +6,39 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <assert.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
-#include "link/object.h"
-#include "link/symbol.h"
-#include "link/section.h"
-#include "link/assign.h"
-#include "link/patch.h"
-#include "link/output.h"
+#include <sys/stat.h>
+
+#include <assert.h>
+#include <inttypes.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "extern/err.h"
 #include "extern/getopt.h"
+#include "link/assign.h"
+#include "link/object.h"
+#include "link/output.h"
+#include "link/patch.h"
+#include "link/section.h"
+#include "link/symbol.h"
 #include "version.h"
 
-bool isDmgMode;               /* -d */
-char       *linkerScriptName; /* -l */
-char const *mapFileName;      /* -m */
-char const *symFileName;      /* -n */
-char const *overlayFileName;  /* -O */
-char const *outputFileName;   /* -o */
-uint8_t padValue;             /* -p */
-bool is32kMode;               /* -t */
-bool beVerbose;               /* -v */
-bool isWRA0Mode;              /* -w */
-bool disablePadding;          /* -x */
+bool isDmgMode;              /* -d */
+char *linkerScriptName;      /* -l */
+char const *mapFileName;     /* -m */
+char const *symFileName;     /* -n */
+char const *overlayFileName; /* -O */
+char const *outputFileName;  /* -o */
+uint8_t padValue;            /* -p */
+bool is32kMode;              /* -t */
+bool beVerbose;              /* -v */
+bool isWRA0Mode;             /* -w */
+bool disablePadding;         /* -x */
 
 static uint32_t nbErrors = 0;
 
@@ -117,7 +118,7 @@ _Noreturn void fatal(struct FileStackNode const *where, uint32_t lineNo, char co
 		nbErrors++;
 
 	fprintf(stderr, "Linking aborted after %" PRIu32 " error%s\n", nbErrors,
-		nbErrors != 1 ? "s" : "");
+	        nbErrors != 1 ? "s" : "");
 	exit(1);
 }
 
@@ -148,41 +149,32 @@ static char const *optstring = "dl:m:n:O:o:p:s:tVvwx";
  * over short opt matching
  */
 static struct option const longopts[] = {
-	{ "dmg",          no_argument,       NULL, 'd' },
-	{ "linkerscript", required_argument, NULL, 'l' },
-	{ "map",          required_argument, NULL, 'm' },
-	{ "sym",          required_argument, NULL, 'n' },
-	{ "overlay",      required_argument, NULL, 'O' },
-	{ "output",       required_argument, NULL, 'o' },
-	{ "pad",          required_argument, NULL, 'p' },
-	{ "smart",        required_argument, NULL, 's' },
-	{ "tiny",         no_argument,       NULL, 't' },
-	{ "version",      no_argument,       NULL, 'V' },
-	{ "verbose",      no_argument,       NULL, 'v' },
-	{ "wramx",        no_argument,       NULL, 'w' },
-	{ "nopad",        no_argument,       NULL, 'x' },
-	{ NULL,           no_argument,       NULL, 0   }
-};
+    {"dmg", no_argument, NULL, 'd'},           {"linkerscript", required_argument, NULL, 'l'},
+    {"map", required_argument, NULL, 'm'},     {"sym", required_argument, NULL, 'n'},
+    {"overlay", required_argument, NULL, 'O'}, {"output", required_argument, NULL, 'o'},
+    {"pad", required_argument, NULL, 'p'},     {"smart", required_argument, NULL, 's'},
+    {"tiny", no_argument, NULL, 't'},          {"version", no_argument, NULL, 'V'},
+    {"verbose", no_argument, NULL, 'v'},       {"wramx", no_argument, NULL, 'w'},
+    {"nopad", no_argument, NULL, 'x'},         {NULL, no_argument, NULL, 0}};
 
 /**
  * Prints the program's usage to stdout.
  */
 static void printUsage(void)
 {
-	fputs(
-"Usage: rgblink [-dtVvwx] [-l script] [-m map_file] [-n sym_file]\n"
-"               [-O overlay_file] [-o out_file] [-p pad_value] [-s symbol]\n"
-"               <file> ...\n"
-"Useful options:\n"
-"    -l, --linkerscript <path>  set the input linker script\n"
-"    -m, --map <path>           set the output map file\n"
-"    -n, --sym <path>           set the output symbol list file\n"
-"    -o, --output <path>        set the output file\n"
-"    -p, --pad <value>          set the value to pad between sections with\n"
-"    -x, --nopad                disable padding of output binary\n"
-"    -V, --version              print RGBLINK version and exits\n"
-"\n"
-"For help, use `man rgblink' or go to https://rgbds.gbdev.io/docs/\n",
+	fputs("Usage: rgblink [-dtVvwx] [-l script] [-m map_file] [-n sym_file]\n"
+	      "               [-O overlay_file] [-o out_file] [-p pad_value] [-s symbol]\n"
+	      "               <file> ...\n"
+	      "Useful options:\n"
+	      "    -l, --linkerscript <path>  set the input linker script\n"
+	      "    -m, --map <path>           set the output map file\n"
+	      "    -n, --sym <path>           set the output symbol list file\n"
+	      "    -o, --output <path>        set the output file\n"
+	      "    -p, --pad <value>          set the value to pad between sections with\n"
+	      "    -x, --nopad                disable padding of output binary\n"
+	      "    -V, --version              print RGBLINK version and exits\n"
+	      "\n"
+	      "For help, use `man rgblink' or go to https://rgbds.gbdev.io/docs/\n",
 	      stderr);
 }
 
@@ -198,12 +190,11 @@ static void cleanup(void)
 int main(int argc, char *argv[])
 {
 	int optionChar;
-	char *endptr; /* For error checking with `strtol` */
+	char *endptr;        /* For error checking with `strtol` */
 	unsigned long value; /* For storing `strtoul`'s return value */
 
 	/* Parse options */
-	while ((optionChar = musl_getopt_long_only(argc, argv, optstring,
-						   longopts, NULL)) != -1) {
+	while ((optionChar = musl_getopt_long_only(argc, argv, optstring, longopts, NULL)) != -1) {
 		switch (optionChar) {
 		case 'd':
 			isDmgMode = true;
@@ -231,7 +222,8 @@ int main(int argc, char *argv[])
 				value = 0xFF;
 			}
 			if (value > 0xFF) {
-				error(NULL, 0, "Argument for 'p' must be a byte (between 0 and 0xFF)");
+				error(NULL, 0,
+				      "Argument for 'p' must be a byte (between 0 and 0xFF)");
 				value = 0xFF;
 			}
 			padValue = value;
@@ -296,8 +288,8 @@ int main(int argc, char *argv[])
 	/* and finally output the result. */
 	patch_ApplyPatches();
 	if (nbErrors) {
-		fprintf(stderr, "Linking failed with %" PRIu32 " error%s\n",
-			nbErrors, nbErrors != 1 ? "s" : "");
+		fprintf(stderr, "Linking failed with %" PRIu32 " error%s\n", nbErrors,
+		        nbErrors != 1 ? "s" : "");
 		exit(1);
 	}
 	out_WriteFiles();

@@ -6,14 +6,16 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asm/main.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <float.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -21,17 +23,14 @@
 #include "asm/charmap.h"
 #include "asm/fstack.h"
 #include "asm/lexer.h"
-#include "asm/main.h"
 #include "asm/output.h"
 #include "asm/rpn.h"
 #include "asm/symbol.h"
 #include "asm/warning.h"
-#include "parser.h"
-
 #include "extern/err.h"
 #include "extern/getopt.h"
-
 #include "helpers.h"
+#include "parser.h"
 #include "version.h"
 
 size_t cldefines_index;
@@ -47,7 +46,7 @@ uint32_t nTotalLines, nIFDepth;
 extern int yydebug;
 #endif
 
-FILE * dependfile;
+FILE *dependfile;
 bool oGeneratedMissingIncludes;
 bool oFailedOnMissingInclude;
 bool oGeneratePhonyDeps;
@@ -212,7 +211,7 @@ void lowerstring(char *s)
 /* Escapes Make-special chars from a string */
 static char *make_escape(const char *str)
 {
-	char * const escaped_str = malloc(strlen(str) * 2 + 1);
+	char *const escaped_str = malloc(strlen(str) * 2 + 1);
 	char *dest = escaped_str;
 
 	if (escaped_str == NULL)
@@ -245,43 +244,40 @@ static int depType; /* Variants of `-M` */
  * This is because long opt matching, even to a single char, is prioritized
  * over short opt matching
  */
-static struct option const longopts[] = {
-	{ "binary-digits",    required_argument, NULL,     'b' },
-	{ "define",           required_argument, NULL,     'D' },
-	{ "export-all",       no_argument,       NULL,     'E' },
-	{ "gfx-chars",        required_argument, NULL,     'g' },
-	{ "halt-without-nop", no_argument,       NULL,     'h' },
-	{ "include",          required_argument, NULL,     'i' },
-	{ "preserve-ld",      no_argument,       NULL,     'L' },
-	{ "dependfile",       required_argument, NULL,     'M' },
-	{ "MG",               no_argument,       &depType, 'G' },
-	{ "MP",               no_argument,       &depType, 'P' },
-	{ "MT",               required_argument, &depType, 'T' },
-	{ "MQ",               required_argument, &depType, 'Q' },
-	{ "output",           required_argument, NULL,     'o' },
-	{ "pad-value",        required_argument, NULL,     'p' },
-	{ "recursion-depth",  required_argument, NULL,     'r' },
-	{ "version",          no_argument,       NULL,     'V' },
-	{ "verbose",          no_argument,       NULL,     'v' },
-	{ "warning",          required_argument, NULL,     'W' },
-	{ NULL,               no_argument,       NULL,     0   }
-};
+static struct option const longopts[] = {{"binary-digits", required_argument, NULL, 'b'},
+                                         {"define", required_argument, NULL, 'D'},
+                                         {"export-all", no_argument, NULL, 'E'},
+                                         {"gfx-chars", required_argument, NULL, 'g'},
+                                         {"halt-without-nop", no_argument, NULL, 'h'},
+                                         {"include", required_argument, NULL, 'i'},
+                                         {"preserve-ld", no_argument, NULL, 'L'},
+                                         {"dependfile", required_argument, NULL, 'M'},
+                                         {"MG", no_argument, &depType, 'G'},
+                                         {"MP", no_argument, &depType, 'P'},
+                                         {"MT", required_argument, &depType, 'T'},
+                                         {"MQ", required_argument, &depType, 'Q'},
+                                         {"output", required_argument, NULL, 'o'},
+                                         {"pad-value", required_argument, NULL, 'p'},
+                                         {"recursion-depth", required_argument, NULL, 'r'},
+                                         {"version", no_argument, NULL, 'V'},
+                                         {"verbose", no_argument, NULL, 'v'},
+                                         {"warning", required_argument, NULL, 'W'},
+                                         {NULL, no_argument, NULL, 0}};
 
 static void print_usage(void)
 {
-	fputs(
-"Usage: rgbasm [-EhLVvw] [-b chars] [-D name[=value]] [-g chars] [-i path]\n"
-"              [-M depend_file] [-MG] [-MP] [-MT target_file] [-MQ target_file]\n"
-"              [-o out_file] [-p pad_value] [-r depth] [-W warning] <file> ...\n"
-"Useful options:\n"
-"    -E, --export-all         export all labels\n"
-"    -M, --dependfile <path>  set the output dependency file\n"
-"    -o, --output <path>      set the output object file\n"
-"    -p, --pad-value <value>  set the value to use for `ds'\n"
-"    -V, --version            print RGBASM version and exit\n"
-"    -W, --warning <warning>  enable or disable warnings\n"
-"\n"
-"For help, use `man rgbasm' or go to https://rgbds.gbdev.io/docs/\n",
+	fputs("Usage: rgbasm [-EhLVvw] [-b chars] [-D name[=value]] [-g chars] [-i path]\n"
+	      "              [-M depend_file] [-MG] [-MP] [-MT target_file] [-MQ target_file]\n"
+	      "              [-o out_file] [-p pad_value] [-r depth] [-W warning] <file> ...\n"
+	      "Useful options:\n"
+	      "    -E, --export-all         export all labels\n"
+	      "    -M, --dependfile <path>  set the output dependency file\n"
+	      "    -o, --output <path>      set the output object file\n"
+	      "    -p, --pad-value <value>  set the value to use for `ds'\n"
+	      "    -V, --version            print RGBASM version and exit\n"
+	      "    -W, --warning <warning>  enable or disable warnings\n"
+	      "\n"
+	      "For help, use `man rgbasm' or go to https://rgbds.gbdev.io/docs/\n",
 	      stderr);
 	exit(1);
 }
@@ -332,8 +328,7 @@ int main(int argc, char *argv[])
 
 	newopt = CurrentOptions;
 
-	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts,
-					   NULL)) != -1) {
+	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'b':
 			if (strlen(optarg) == 2) {
@@ -374,8 +369,7 @@ int main(int argc, char *argv[])
 			else
 				dependfile = fopen(optarg, "w");
 			if (dependfile == NULL)
-				err(1, "Could not open dependfile %s",
-				    optarg);
+				err(1, "Could not open dependfile %s", optarg);
 			break;
 		case 'o':
 			out_SetFileName(optarg);
@@ -421,8 +415,7 @@ int main(int argc, char *argv[])
 			case 'Q':
 			case 'T':
 				if (optind == argc)
-					errx(1, "-M%c takes a target file name argument",
-					     depType);
+					errx(1, "-M%c takes a target file name argument", depType);
 				ep = optarg;
 				if (depType == 'Q')
 					ep = make_escape(ep);
@@ -430,21 +423,18 @@ int main(int argc, char *argv[])
 				nTargetFileNameLen += strlen(ep) + 1;
 				if (!tzTargetFileName) {
 					/* On first alloc, make an empty str */
-					tzTargetFileName =
-						malloc(nTargetFileNameLen + 1);
+					tzTargetFileName = malloc(nTargetFileNameLen + 1);
 					*tzTargetFileName = '\0';
 				} else {
 					tzTargetFileName =
-						realloc(tzTargetFileName,
-							nTargetFileNameLen + 1);
+					    realloc(tzTargetFileName, nTargetFileNameLen + 1);
 				}
 				if (tzTargetFileName == NULL)
 					err(1, "Cannot append new file to target file list");
 				strcat(tzTargetFileName, ep);
 				if (depType == 'Q')
 					free(ep);
-				char *ptr = tzTargetFileName +
-					strlen(tzTargetFileName);
+				char *ptr = tzTargetFileName + strlen(tzTargetFileName);
 				*ptr++ = ' ';
 				*ptr = '\0';
 				break;
@@ -479,7 +469,9 @@ int main(int argc, char *argv[])
 
 	if (dependfile) {
 		if (!tzTargetFileName)
-			errx(1, "Dependency files can only be created if a target file is specified with either -o, -MQ or -MT.\n");
+			errx(
+			    1,
+			    "Dependency files can only be created if a target file is specified with either -o, -MQ or -MT.\n");
 
 		fprintf(dependfile, "%s: %s\n", tzTargetFileName, tzMainfile);
 	}
@@ -506,25 +498,21 @@ int main(int argc, char *argv[])
 		fclose(dependfile);
 
 	if (nIFDepth != 0)
-		errx(1, "Unterminated IF construct (%" PRIu32 " levels)!",
-		     nIFDepth);
+		errx(1, "Unterminated IF construct (%" PRIu32 " levels)!", nIFDepth);
 
 	sect_CheckUnionClosed();
 
 	double timespent;
 
 	nEndClock = clock();
-	timespent = ((double)(nEndClock - nStartClock))
-		     / (double)CLOCKS_PER_SEC;
+	timespent = ((double)(nEndClock - nStartClock)) / (double)CLOCKS_PER_SEC;
 	if (verbose) {
-		printf("Success! %" PRIu32 " lines in %d.%02d seconds ",
-		       nTotalLines, (int)timespent,
-		       ((int)(timespent * 100.0)) % 100);
+		printf("Success! %" PRIu32 " lines in %d.%02d seconds ", nTotalLines,
+		       (int)timespent, ((int)(timespent * 100.0)) % 100);
 		if (timespent < FLT_MIN_EXP)
 			printf("(INFINITY lines/minute)\n");
 		else
-			printf("(%d lines/minute)\n",
-			       (int)(60 / timespent * nTotalLines));
+			printf("(%d lines/minute)\n", (int)(60 / timespent * nTotalLines));
 	}
 
 	if (oFailedOnMissingInclude)

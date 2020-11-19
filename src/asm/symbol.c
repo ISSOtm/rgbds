@@ -10,6 +10,8 @@
  * Symboltable and macroargs stuff
  */
 
+#include "asm/symbol.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -25,12 +27,9 @@
 #include "asm/mymath.h"
 #include "asm/output.h"
 #include "asm/section.h"
-#include "asm/symbol.h"
 #include "asm/util.h"
 #include "asm/warning.h"
-
 #include "extern/err.h"
-
 #include "hashmap.h"
 #include "helpers.h"
 #include "version.h"
@@ -71,7 +70,7 @@ static void forEachWrapper(void *_symbol, void *_argWrapper)
 
 void sym_ForEach(void (*func)(struct Symbol *, void *), void *arg)
 {
-	struct ForEachArgs argWrapper = { .func = func, .arg = arg };
+	struct ForEachArgs argWrapper = {.func = func, .arg = arg};
 
 	hash_ForEach(symbols, forEachWrapper, &argWrapper);
 }
@@ -115,7 +114,7 @@ static char const *Callback__FILE__(void)
 			buf = realloc(buf, bufsize);
 			if (!buf)
 				fatalerror("Failed to grow buffer for file name: %s\n",
-					   strerror(errno));
+				           strerror(errno));
 		}
 		/* Escape quotes, since we're returning a string */
 		if (fileName[i] == '"')
@@ -211,8 +210,8 @@ static struct Symbol *createsymbol(char const *s)
  * Creates the full name of a local symbol in a given scope, by prepending
  * the name with the parent symbol's name.
  */
-static void fullSymbolName(char *output, size_t outputSize,
-			   char const *localName, char const *scopeName)
+static void fullSymbolName(char *output, size_t outputSize, char const *localName,
+                           char const *scopeName)
 {
 	int ret = snprintf(output, outputSize, "%s%s", scopeName, localName);
 
@@ -405,8 +404,8 @@ struct Symbol *sym_AddSet(char const *symName, int32_t value)
 	if (sym == NULL) {
 		sym = createsymbol(symName);
 	} else if (sym_IsDefined(sym) && sym->type != SYM_SET) {
-		error("'%s' already defined as %s at ",
-		      symName, sym->type == SYM_LABEL ? "label" : "constant");
+		error("'%s' already defined as %s at ", symName,
+		      sym->type == SYM_LABEL ? "label" : "constant");
 		dumpFilename(sym);
 		putc('\n', stderr);
 		return sym;
@@ -487,7 +486,7 @@ struct Symbol *sym_AddLocalLabel(char const *name)
 			error("Not currently in the scope of '%.*s'\n", parentLen, name);
 		if (strchr(&name[parentLen + 1], '.')) /* There will at least be a terminator */
 			fatalerror("'%s' is a nonsensical reference to a nested local label\n",
-				   name);
+			           name);
 	}
 
 	return addLabel(name);
@@ -632,13 +631,11 @@ void sym_Init(void)
 
 	strftime(savedTIME, sizeof(savedTIME), "\"%H:%M:%S\"", time_local);
 	strftime(savedDATE, sizeof(savedDATE), "\"%d %B %Y\"", time_local);
-	strftime(savedTIMESTAMP_ISO8601_LOCAL,
-		 sizeof(savedTIMESTAMP_ISO8601_LOCAL), "\"%Y-%m-%dT%H:%M:%S%z\"",
-		 time_local);
+	strftime(savedTIMESTAMP_ISO8601_LOCAL, sizeof(savedTIMESTAMP_ISO8601_LOCAL),
+	         "\"%Y-%m-%dT%H:%M:%S%z\"", time_local);
 
-	strftime(savedTIMESTAMP_ISO8601_UTC,
-		 sizeof(savedTIMESTAMP_ISO8601_UTC), "\"%Y-%m-%dT%H:%M:%SZ\"",
-		 time_utc);
+	strftime(savedTIMESTAMP_ISO8601_UTC, sizeof(savedTIMESTAMP_ISO8601_UTC),
+	         "\"%Y-%m-%dT%H:%M:%SZ\"", time_utc);
 
 	strftime(savedYEAR, sizeof(savedYEAR), "%Y", time_utc);
 	strftime(savedMONTH, sizeof(savedMONTH), "%m", time_utc);

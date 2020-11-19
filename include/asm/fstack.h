@@ -18,7 +18,6 @@
 
 #include "asm/asm.h"
 #include "asm/lexer.h"
-
 #include "types.h"
 
 struct FileStackNode {
@@ -27,10 +26,11 @@ struct FileStackNode {
 	uint32_t lineNo;
 
 	struct FileStackNode *next; /* Next node in the output linked list */
-	bool referenced; /* If referenced, don't free! */
+	bool referenced;            /* If referenced, don't free! */
 	uint32_t ID; /* Set only if referenced: ID within the object file, -1 if not output yet */
 
-	enum {
+	enum
+	{
 		NODE_REPT,
 		NODE_FILE,
 		NODE_MACRO,

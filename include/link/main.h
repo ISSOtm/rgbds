@@ -10,15 +10,15 @@
 #ifndef RGBDS_LINK_MAIN_H
 #define RGBDS_LINK_MAIN_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "helpers.h"
 
 /* Variables related to CLI options */
 extern bool isDmgMode;
-extern char       *linkerScriptName;
+extern char *linkerScriptName;
 extern char const *mapFileName;
 extern char const *symFileName;
 extern char const *overlayFileName;
@@ -34,14 +34,15 @@ struct FileStackNode {
 	/* Line at which the parent context was exited; meaningless for the root level */
 	uint32_t lineNo;
 
-	enum {
+	enum
+	{
 		NODE_REPT,
 		NODE_FILE,
 		NODE_MACRO,
 	} type;
 	union {
 		char *name; /* NODE_FILE, NODE_MACRO */
-		struct { /* NODE_REPT */
+		struct {    /* NODE_REPT */
 			uint32_t reptDepth;
 			uint32_t *iters;
 		};
@@ -49,10 +50,11 @@ struct FileStackNode {
 };
 
 /* Helper macro for printing verbose-mode messages */
-#define verbosePrint(...)   do { \
-					if (beVerbose) \
-						fprintf(stderr, __VA_ARGS__); \
-				} while (0)
+#define verbosePrint(...)                             \
+	do {                                          \
+		if (beVerbose)                        \
+			fprintf(stderr, __VA_ARGS__); \
+	} while (0)
 
 /**
  * Dump a file stack to stderr
@@ -60,14 +62,14 @@ struct FileStackNode {
  */
 char const *dumpFileStack(struct FileStackNode const *node);
 
-void warning(struct FileStackNode const *where, uint32_t lineNo,
-	     char const *fmt, ...) format_(printf, 3, 4);
+void warning(struct FileStackNode const *where, uint32_t lineNo, char const *fmt, ...)
+    format_(printf, 3, 4);
 
-void error(struct FileStackNode const *where, uint32_t lineNo,
-	   char const *fmt, ...) format_(printf, 3, 4);
+void error(struct FileStackNode const *where, uint32_t lineNo, char const *fmt, ...)
+    format_(printf, 3, 4);
 
-_Noreturn void fatal(struct FileStackNode const *where, uint32_t lineNo,
-		     char const *fmt, ...) format_(printf, 3, 4);
+_Noreturn void fatal(struct FileStackNode const *where, uint32_t lineNo, char const *fmt, ...)
+    format_(printf, 3, 4);
 
 /**
  * Opens a file if specified, and aborts on error.
@@ -77,10 +79,11 @@ _Noreturn void fatal(struct FileStackNode const *where, uint32_t lineNo,
  */
 FILE *openFile(char const *fileName, char const *mode);
 
-#define closeFile(file) do { \
-				FILE *tmp = file; \
-				if (tmp) \
-					fclose(tmp); \
-			} while (0)
+#define closeFile(file)              \
+	do {                         \
+		FILE *tmp = file;    \
+		if (tmp)             \
+			fclose(tmp); \
+	} while (0)
 
 #endif /* RGBDS_LINK_MAIN_H */

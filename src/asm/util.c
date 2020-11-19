@@ -6,13 +6,13 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asm/util.h"
+
 #include <ctype.h>
 #include <stdint.h>
 
 #include "asm/main.h"
-#include "asm/util.h"
 #include "asm/warning.h"
-
 #include "extern/utf8decoder.h"
 
 /*

@@ -13,7 +13,6 @@
 #include <stdlib.h>
 
 #include "asm/warning.h"
-
 #include "helpers.h"
 
 struct MacroArgs;

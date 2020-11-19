@@ -14,13 +14,13 @@
 #include <string.h>
 
 #include "asm/section.h"
-
 #include "types.h"
 
-#define HASHSIZE	(1 << 16)
-#define MAXSYMLEN	256
+#define HASHSIZE (1 << 16)
+#define MAXSYMLEN 256
 
-enum SymbolType {
+enum SymbolType
+{
 	SYM_LABEL,
 	SYM_EQU,
 	SYM_SET,
@@ -36,7 +36,7 @@ struct Symbol {
 	bool isBuiltin;  /* Whether the symbol is a built-in */
 	struct Section *section;
 	struct FileStackNode *src; /* Where the symbol was defined */
-	uint32_t fileLine; /* Line where the symbol was defined */
+	uint32_t fileLine;         /* Line where the symbol was defined */
 
 	bool hasCallback;
 	union {
@@ -52,7 +52,7 @@ struct Symbol {
 		char const *(*strCallback)(void); /* For SYM_EQUS */
 	};
 
-	uint32_t ID; /* ID of the symbol in the object file (-1 if none) */
+	uint32_t ID;         /* ID of the symbol in the object file (-1 if none) */
 	struct Symbol *next; /* Next object to output in the object file */
 };
 
@@ -80,8 +80,7 @@ static inline bool sym_IsConstant(struct Symbol const *sym)
 
 static inline bool sym_IsNumeric(struct Symbol const *sym)
 {
-	return sym->type == SYM_LABEL || sym->type == SYM_EQU
-	    || sym->type == SYM_SET;
+	return sym->type == SYM_LABEL || sym->type == SYM_EQU || sym->type == SYM_SET;
 }
 
 static inline bool sym_IsLabel(struct Symbol const *sym)

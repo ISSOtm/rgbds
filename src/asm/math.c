@@ -18,11 +18,11 @@
 #include "asm/mymath.h"
 #include "asm/symbol.h"
 
-#define fx2double(i)	((double)((i) / 65536.0))
-#define double2fx(d)	((int32_t)((d) * 65536.0))
+#define fx2double(i) ((double)((i) / 65536.0))
+#define double2fx(d) ((int32_t)((d)*65536.0))
 
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+	#define M_PI 3.14159265358979323846
 #endif
 
 /*

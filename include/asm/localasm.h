@@ -92,7 +92,8 @@
  */
 
 /* "r" defs */
-enum {
+enum
+{
 	REG_B = 0,
 	REG_C,
 	REG_D,
@@ -104,7 +105,8 @@ enum {
 };
 
 /* "rr" defs */
-enum {
+enum
+{
 	REG_BC_IND = 0,
 	REG_DE_IND,
 	REG_HL_INDINC,
@@ -112,7 +114,8 @@ enum {
 };
 
 /* "ss" defs (SP) and "tt" defs (AF) */
-enum {
+enum
+{
 	REG_BC = 0,
 	REG_DE = 1,
 	REG_HL = 2,
@@ -121,7 +124,8 @@ enum {
 };
 
 /* "cc" defs */
-enum {
+enum
+{
 	CC_NZ = 0,
 	CC_Z,
 	CC_NC,

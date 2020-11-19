@@ -9,8 +9,8 @@
 #ifndef RGBDS_SECTION_H
 #define RGBDS_SECTION_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "linkdefs.h"
 
@@ -38,10 +38,9 @@ struct SectionSpec {
 
 struct Section *out_FindSectionByName(const char *name);
 void out_NewSection(char const *name, uint32_t secttype, uint32_t org,
-		    struct SectionSpec const *attributes,
-		    enum SectionModifier mod);
+                    struct SectionSpec const *attributes, enum SectionModifier mod);
 void out_SetLoadSection(char const *name, uint32_t secttype, uint32_t org,
-			struct SectionSpec const *attributes);
+                        struct SectionSpec const *attributes);
 void out_EndLoadSection(void);
 
 struct Section *sect_GetSymbolSection(void);

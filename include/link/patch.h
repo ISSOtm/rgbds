@@ -14,7 +14,6 @@
 #include <stdint.h>
 
 #include "link/section.h"
-
 #include "linkdefs.h"
 
 struct Assertion {

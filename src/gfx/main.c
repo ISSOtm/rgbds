@@ -6,11 +6,11 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "gfx/main.h"
+
 #include <png.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "gfx/main.h"
 
 #include "extern/getopt.h"
 #include "version.h"
@@ -30,43 +30,40 @@ static char const *optstring = "Aa:CDd:Ffhmo:Pp:Tt:uVvx:";
  * This is because long opt matching, even to a single char, is prioritized
  * over short opt matching
  */
-static struct option const longopts[] = {
-	{ "output-attr-map", no_argument,       NULL, 'A' },
-	{ "attr-map",        required_argument, NULL, 'a' },
-	{ "color-curve",     no_argument,       NULL, 'C' },
-	{ "debug",           no_argument,       NULL, 'D' },
-	{ "depth",           required_argument, NULL, 'd' },
-	{ "fix",             no_argument,       NULL, 'f' },
-	{ "fix-and-save",    no_argument,       NULL, 'F' },
-	{ "horizontal",      no_argument,       NULL, 'h' },
-	{ "mirror-tiles",    no_argument,       NULL, 'm' },
-	{ "output",          required_argument, NULL, 'o' },
-	{ "output-palette",  no_argument,       NULL, 'P' },
-	{ "palette",         required_argument, NULL, 'p' },
-	{ "output-tilemap",  no_argument,       NULL, 'T' },
-	{ "tilemap",         required_argument, NULL, 't' },
-	{ "unique-tiles",    no_argument,       NULL, 'u' },
-	{ "version",         no_argument,       NULL, 'V' },
-	{ "verbose",         no_argument,       NULL, 'v' },
-	{ "trim-end",        required_argument, NULL, 'x' },
-	{ NULL,              no_argument,       NULL, 0   }
-};
+static struct option const longopts[] = {{"output-attr-map", no_argument, NULL, 'A'},
+                                         {"attr-map", required_argument, NULL, 'a'},
+                                         {"color-curve", no_argument, NULL, 'C'},
+                                         {"debug", no_argument, NULL, 'D'},
+                                         {"depth", required_argument, NULL, 'd'},
+                                         {"fix", no_argument, NULL, 'f'},
+                                         {"fix-and-save", no_argument, NULL, 'F'},
+                                         {"horizontal", no_argument, NULL, 'h'},
+                                         {"mirror-tiles", no_argument, NULL, 'm'},
+                                         {"output", required_argument, NULL, 'o'},
+                                         {"output-palette", no_argument, NULL, 'P'},
+                                         {"palette", required_argument, NULL, 'p'},
+                                         {"output-tilemap", no_argument, NULL, 'T'},
+                                         {"tilemap", required_argument, NULL, 't'},
+                                         {"unique-tiles", no_argument, NULL, 'u'},
+                                         {"version", no_argument, NULL, 'V'},
+                                         {"verbose", no_argument, NULL, 'v'},
+                                         {"trim-end", required_argument, NULL, 'x'},
+                                         {NULL, no_argument, NULL, 0}};
 
 static void print_usage(void)
 {
-	fputs(
-"Usage: rgbgfx [-CDhmuVv] [-f | -F] [-a <attr_map> | -A] [-d <depth>]\n"
-"              [-o <out_file>] [-p <pal_file> | -P] [-t <tile_map> | -T]\n"
-"              [-x <tiles>] <file>\n"
-"Useful options:\n"
-"    -f, --fix                 make the input image an indexed PNG\n"
-"    -m, --mirror-tiles        optimize out mirrored tiles\n"
-"    -o, --output <path>       set the output binary file\n"
-"    -t, --tilemap <path>      set the output tilemap file\n"
-"    -u, --unique-tiles        optimize out identical tiles\n"
-"    -V, --version             print RGBGFX version and exit\n"
-"\n"
-"For help, use `man rgbgfx' or go to https://rgbds.gbdev.io/docs/\n",
+	fputs("Usage: rgbgfx [-CDhmuVv] [-f | -F] [-a <attr_map> | -A] [-d <depth>]\n"
+	      "              [-o <out_file>] [-p <pal_file> | -P] [-t <tile_map> | -T]\n"
+	      "              [-x <tiles>] <file>\n"
+	      "Useful options:\n"
+	      "    -f, --fix                 make the input image an indexed PNG\n"
+	      "    -m, --mirror-tiles        optimize out mirrored tiles\n"
+	      "    -o, --output <path>       set the output binary file\n"
+	      "    -t, --tilemap <path>      set the output tilemap file\n"
+	      "    -u, --unique-tiles        optimize out identical tiles\n"
+	      "    -V, --version             print RGBGFX version and exit\n"
+	      "\n"
+	      "For help, use `man rgbgfx' or go to https://rgbds.gbdev.io/docs/\n",
 	      stderr);
 	exit(1);
 }
@@ -89,8 +86,7 @@ int main(int argc, char *argv[])
 
 	depth = 2;
 
-	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts,
-					   NULL)) != -1) {
+	while ((ch = musl_getopt_long_only(argc, argv, optstring, longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'A':
 			opts.attrmapout = true;
@@ -161,8 +157,7 @@ int main(int argc, char *argv[])
 	}
 
 #define WARN_MISMATCH(property) \
-	warnx("The PNG's " property \
-	      " setting doesn't match the one defined on the command line")
+	warnx("The PNG's " property " setting doesn't match the one defined on the command line")
 
 	opts.infile = argv[argc - 1];
 
@@ -200,19 +195,21 @@ int main(int argc, char *argv[])
 		opts.trim = png_options.trim;
 
 	if (raw_image->width % 8) {
-		errx(1, "Input PNG file %s not sized correctly. The image's width must be a multiple of 8.",
-		     opts.infile);
+		errx(
+		    1,
+		    "Input PNG file %s not sized correctly. The image's width must be a multiple of 8.",
+		    opts.infile);
 	}
 	if (raw_image->width / 8 > 1 && raw_image->height % 8) {
-		errx(1, "Input PNG file %s not sized correctly. If the image is more than 1 tile wide, its height must be a multiple of 8.",
-		     opts.infile);
+		errx(
+		    1,
+		    "Input PNG file %s not sized correctly. If the image is more than 1 tile wide, its height must be a multiple of 8.",
+		    opts.infile);
 	}
 
-	if (opts.trim &&
-	    opts.trim > (raw_image->width / 8) * (raw_image->height / 8) - 1) {
-		errx(1, "Trim (%d) for input raw_image file '%s' too large (max: %u)",
-		     opts.trim, opts.infile,
-		     (raw_image->width / 8) * (raw_image->height / 8) - 1);
+	if (opts.trim && opts.trim > (raw_image->width / 8) * (raw_image->height / 8) - 1) {
+		errx(1, "Trim (%d) for input raw_image file '%s' too large (max: %u)", opts.trim,
+		     opts.infile, (raw_image->width / 8) * (raw_image->height / 8) - 1);
 	}
 
 	if (strcmp(png_options.tilemapfile, opts.tilemapfile) != 0) {

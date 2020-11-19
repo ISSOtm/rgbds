@@ -6,20 +6,20 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asm/charmap.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "asm/asm.h"
-#include "asm/charmap.h"
 #include "asm/main.h"
 #include "asm/output.h"
 #include "asm/util.h"
 #include "asm/warning.h"
-
 #include "hashmap.h"
 
 /*
@@ -29,7 +29,7 @@
  */
 struct Charnode {
 	bool isTerminal; /* Whether there exists a mapping that ends here */
-	uint8_t value; /* If the above is true, its corresponding value */
+	uint8_t value;   /* If the above is true, its corresponding value */
 	/* This MUST be indexes and not pointers, because pointers get invalidated by `realloc`!! */
 	size_t next[255]; /* Indexes of where to go next, 0 = nowhere */
 };
@@ -38,8 +38,8 @@ struct Charnode {
 
 struct Charmap {
 	char *name;
-	size_t usedNodes; /* How many nodes are being used */
-	size_t capacity; /* How many nodes have been allocated */
+	size_t usedNodes;        /* How many nodes are being used */
+	size_t capacity;         /* How many nodes have been allocated */
 	struct Charnode nodes[]; /* first node is reserved for the root node */
 };
 
@@ -64,8 +64,8 @@ static inline struct Charmap *resizeCharmap(struct Charmap *map, size_t capacity
 	struct Charmap *new = realloc(map, sizeof(*map) + sizeof(*map->nodes) * capacity);
 
 	if (!new)
-		fatalerror("Failed to %s charmap: %s\n",
-			   map ? "create" : "resize", strerror(errno));
+		fatalerror("Failed to %s charmap: %s\n", map ? "create" : "resize",
+		           strerror(errno));
 	new->capacity = capacity;
 	return new;
 }
@@ -172,7 +172,8 @@ void charmap_Add(char *mapping, uint8_t value)
 			/* If no more nodes are available, get new ones */
 			if (currentCharmap->usedNodes == currentCharmap->capacity) {
 				currentCharmap->capacity *= 2;
-				currentCharmap = resizeCharmap(currentCharmap, currentCharmap->capacity);
+				currentCharmap =
+				    resizeCharmap(currentCharmap, currentCharmap->capacity);
 				hash_ReplaceElement(charmaps, currentCharmap->name, currentCharmap);
 			}
 
@@ -229,7 +230,8 @@ size_t charmap_Convert(char const *input, uint8_t *output)
 			} else if (*input) { /* No match found */
 				size_t codepointLen = readUTF8Char(output, input);
 
-				input += codepointLen; /* OK because UTF-8 has no NUL in multi-byte chars */
+				input += codepointLen; /* OK because UTF-8 has no NUL in multi-byte
+				                          chars */
 				output += codepointLen;
 				outputLen += codepointLen;
 			}

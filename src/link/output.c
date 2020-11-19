@@ -6,18 +6,18 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "link/output.h"
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "link/output.h"
+#include "extern/err.h"
 #include "link/main.h"
 #include "link/section.h"
 #include "link/symbol.h"
 
-#include "extern/err.h"
-
-FILE * outputFile;
+FILE *outputFile;
 FILE *overlayFile;
 FILE *symFile;
 FILE *mapFile;
@@ -32,36 +32,27 @@ static struct {
 	struct SortedSections {
 		struct SortedSection *sections;
 		struct SortedSection *zeroLenSections;
-	} *banks;
+	} * banks;
 } sections[SECTTYPE_INVALID];
 
 void out_AddSection(struct Section const *section)
 {
 	static uint32_t maxNbBanks[] = {
-		[SECTTYPE_ROM0]  = 1,
-		[SECTTYPE_ROMX]  = UINT32_MAX,
-		[SECTTYPE_VRAM]  = 2,
-		[SECTTYPE_SRAM]  = UINT32_MAX,
-		[SECTTYPE_WRAM0] = 1,
-		[SECTTYPE_WRAMX] = 7,
-		[SECTTYPE_OAM]   = 1,
-		[SECTTYPE_HRAM]  = 1
-	};
+	    [SECTTYPE_ROM0] = 1,          [SECTTYPE_ROMX] = UINT32_MAX, [SECTTYPE_VRAM] = 2,
+	    [SECTTYPE_SRAM] = UINT32_MAX, [SECTTYPE_WRAM0] = 1,         [SECTTYPE_WRAMX] = 7,
+	    [SECTTYPE_OAM] = 1,           [SECTTYPE_HRAM] = 1};
 
 	uint32_t targetBank = section->bank - bankranges[section->type][0];
 	uint32_t minNbBanks = targetBank + 1;
 
 	if (minNbBanks > maxNbBanks[section->type])
 		errx(1, "Section \"%s\" has an invalid bank range (%" PRIu32 " > %" PRIu32 ")",
-		     section->name, section->bank,
-		     maxNbBanks[section->type] - 1);
+		     section->name, section->bank, maxNbBanks[section->type] - 1);
 
 	if (minNbBanks > sections[section->type].nbBanks) {
 		sections[section->type].banks =
-			realloc(sections[section->type].banks,
-				sizeof(*sections[0].banks) * minNbBanks);
-		for (uint32_t i = sections[section->type].nbBanks;
-		     i < minNbBanks; i++) {
+		    realloc(sections[section->type].banks, sizeof(*sections[0].banks) * minNbBanks);
+		for (uint32_t i = sections[section->type].nbBanks; i < minNbBanks; i++) {
 			sections[section->type].banks[i].sections = NULL;
 			sections[section->type].banks[i].zeroLenSections = NULL;
 		}
@@ -72,8 +63,8 @@ void out_AddSection(struct Section const *section)
 
 	struct SortedSection *newSection = malloc(sizeof(*newSection));
 	struct SortedSection **ptr = section->size
-		? &sections[section->type].banks[targetBank].sections
-		: &sections[section->type].banks[targetBank].zeroLenSections;
+				       ? &sections[section->type].banks[targetBank].sections
+				       : &sections[section->type].banks[targetBank].zeroLenSections;
 
 	if (!newSection)
 		err(1, "Failed to add new section \"%s\"", section->name);
@@ -89,12 +80,11 @@ void out_AddSection(struct Section const *section)
 struct Section const *out_OverlappingSection(struct Section const *section)
 {
 	struct SortedSections *banks = sections[section->type].banks;
-	struct SortedSection *ptr =
-		banks[section->bank - bankranges[section->type][0]].sections;
+	struct SortedSection *ptr = banks[section->bank - bankranges[section->type][0]].sections;
 
 	while (ptr) {
 		if (ptr->section->org < section->org + section->size
-		 && section->org < ptr->section->org + ptr->section->size)
+		    && section->org < ptr->section->org + ptr->section->size)
 			return ptr->section;
 		ptr = ptr->next;
 	}
@@ -129,13 +119,11 @@ static void checkOverlay(void)
 
 	if (nbOverlayBanks > sections[SECTTYPE_ROMX].nbBanks) {
 		sections[SECTTYPE_ROMX].banks =
-			realloc(sections[SECTTYPE_ROMX].banks,
-				sizeof(*sections[SECTTYPE_ROMX].banks) *
-					nbOverlayBanks);
+		    realloc(sections[SECTTYPE_ROMX].banks,
+		            sizeof(*sections[SECTTYPE_ROMX].banks) * nbOverlayBanks);
 		if (!sections[SECTTYPE_ROMX].banks)
 			err(1, "Failed to realloc banks for overlay");
-		for (uint32_t i = sections[SECTTYPE_ROMX].nbBanks;
-		     i < nbOverlayBanks; i++) {
+		for (uint32_t i = sections[SECTTYPE_ROMX].nbBanks; i < nbOverlayBanks; i++) {
 			sections[SECTTYPE_ROMX].banks[i].sections = NULL;
 			sections[SECTTYPE_ROMX].banks[i].zeroLenSections = NULL;
 		}
@@ -149,8 +137,7 @@ static void checkOverlay(void)
  * @param baseOffset The address of the bank's first byte in GB address space
  * @param size The size of the bank
  */
-static void writeBank(struct SortedSection *bankSections, uint16_t baseOffset,
-		      uint16_t size)
+static void writeBank(struct SortedSection *bankSections, uint16_t baseOffset, uint16_t size)
 {
 	uint16_t offset = 0;
 
@@ -159,14 +146,12 @@ static void writeBank(struct SortedSection *bankSections, uint16_t baseOffset,
 
 		/* Output padding up to the next SECTION */
 		while (offset + baseOffset < section->org) {
-			putc(overlayFile ? getc(overlayFile) : padValue,
-			     outputFile);
+			putc(overlayFile ? getc(overlayFile) : padValue, outputFile);
 			offset++;
 		}
 
 		/* Output the section itself */
-		fwrite(section->data, sizeof(*section->data), section->size,
-		       outputFile);
+		fwrite(section->data, sizeof(*section->data), section->size, outputFile);
 		if (overlayFile) {
 			/* Skip bytes even with pipes */
 			for (uint16_t i = 0; i < section->size; i++)
@@ -179,9 +164,7 @@ static void writeBank(struct SortedSection *bankSections, uint16_t baseOffset,
 
 	if (!disablePadding) {
 		while (offset < size) {
-			putc(overlayFile ? getc(overlayFile)
-					 : padValue,
-			     outputFile);
+			putc(overlayFile ? getc(overlayFile) : padValue, outputFile);
 			offset++;
 		}
 	}
@@ -199,12 +182,10 @@ static void writeROM(void)
 
 	if (outputFile) {
 		if (sections[SECTTYPE_ROM0].nbBanks > 0)
-			writeBank(sections[SECTTYPE_ROM0].banks[0].sections,
-				  0x0000, 0x4000);
+			writeBank(sections[SECTTYPE_ROM0].banks[0].sections, 0x0000, 0x4000);
 
-		for (uint32_t i = 0 ; i < sections[SECTTYPE_ROMX].nbBanks; i++)
-			writeBank(sections[SECTTYPE_ROMX].banks[i].sections,
-				  0x4000, 0x4000);
+		for (uint32_t i = 0; i < sections[SECTTYPE_ROMX].nbBanks; i++)
+			writeBank(sections[SECTTYPE_ROMX].banks[i].sections, 0x4000, 0x4000);
 	}
 
 	closeFile(outputFile);
@@ -218,7 +199,7 @@ static void writeROM(void)
  * @return The lowest section of the two, or the non-NULL one if applicable
  */
 static struct SortedSection const **nextSection(struct SortedSection const **s1,
-						struct SortedSection const **s2)
+                                                struct SortedSection const **s2)
 {
 	if (!*s1)
 		return s2;
@@ -243,18 +224,15 @@ static void writeSymBank(struct SortedSections const *bankSections)
 		uint32_t i;
 		struct Symbol const *sym;
 		uint16_t addr;
-	} sectList = { .sections = bankSections->sections, .i = 0 },
-	zlSectList = { .sections = bankSections->zeroLenSections, .i = 0 },
-	  *minSectList;
+	} sectList = {.sections = bankSections->sections, .i = 0},
+	  zlSectList = {.sections = bankSections->zeroLenSections, .i = 0}, *minSectList;
 
 	for (;;) {
-		while (sectList.sections
-		    && sectList.i   == sectList.sect->nbSymbols) {
-			sectList.sections   = sectList.sections->next;
-			sectList.i   = 0;
+		while (sectList.sections && sectList.i == sectList.sect->nbSymbols) {
+			sectList.sections = sectList.sections->next;
+			sectList.i = 0;
 		}
-		while (zlSectList.sections
-		    && zlSectList.i == zlSectList.sect->nbSymbols) {
+		while (zlSectList.sections && zlSectList.i == zlSectList.sect->nbSymbols) {
 			zlSectList.sections = zlSectList.sections->next;
 			zlSectList.i = 0;
 		}
@@ -262,32 +240,25 @@ static void writeSymBank(struct SortedSections const *bankSections)
 		if (!sectList.sections && !zlSectList.sections) {
 			break;
 		} else if (sectList.sections && zlSectList.sections) {
-			sectList.sym   = sectList.sect->symbols[sectList.i];
+			sectList.sym = sectList.sect->symbols[sectList.i];
 			zlSectList.sym = zlSectList.sect->symbols[zlSectList.i];
-			sectList.addr =
-				sectList.sym->offset   + sectList.sect->org;
-			zlSectList.addr =
-				zlSectList.sym->offset + zlSectList.sect->org;
+			sectList.addr = sectList.sym->offset + sectList.sect->org;
+			zlSectList.addr = zlSectList.sym->offset + zlSectList.sect->org;
 
-			minSectList = sectList.addr < zlSectList.addr
-								? &sectList
-								: &zlSectList;
+			minSectList = sectList.addr < zlSectList.addr ? &sectList : &zlSectList;
 		} else if (sectList.sections) {
-			sectList.sym   = sectList.sect->symbols[sectList.i];
-			sectList.addr   =
-				sectList.sym->offset   + sectList.sect->org;
+			sectList.sym = sectList.sect->symbols[sectList.i];
+			sectList.addr = sectList.sym->offset + sectList.sect->org;
 
 			minSectList = &sectList;
 		} else {
 			zlSectList.sym = zlSectList.sect->symbols[zlSectList.i];
-			zlSectList.addr =
-				zlSectList.sym->offset + zlSectList.sect->org;
+			zlSectList.addr = zlSectList.sym->offset + zlSectList.sect->org;
 
 			minSectList = &zlSectList;
 		}
-		fprintf(symFile, "%02" PRIx32 ":%04" PRIx16 " %s\n",
-			minSectList->sect->bank, minSectList->addr,
-			minSectList->sym->name);
+		fprintf(symFile, "%02" PRIx32 ":%04" PRIx16 " %s\n", minSectList->sect->bank,
+		        minSectList->addr, minSectList->sym->name);
 		minSectList->i++;
 	}
 #undef sect
@@ -297,40 +268,38 @@ static void writeSymBank(struct SortedSections const *bankSections)
  * Write a bank's contents to the map file
  * @param bankSections The bank's sections
  */
-static void writeMapBank(struct SortedSections const *sectList,
-			 enum SectionType type, uint32_t bank)
+static void writeMapBank(struct SortedSections const *sectList, enum SectionType type,
+                         uint32_t bank)
 {
 	if (!mapFile)
 		return;
 
-	struct SortedSection const *section        = sectList->sections;
+	struct SortedSection const *section = sectList->sections;
 	struct SortedSection const *zeroLenSection = sectList->zeroLenSections;
 
-	fprintf(mapFile, "%s bank #%" PRIu32 ":\n", typeNames[type],
-		bank + bankranges[type][0]);
+	fprintf(mapFile, "%s bank #%" PRIu32 ":\n", typeNames[type], bank + bankranges[type][0]);
 
 	uint16_t slack = maxsize[type];
 
 	while (section || zeroLenSection) {
-		struct SortedSection const **pickedSection =
-			nextSection(&section, &zeroLenSection);
+		struct SortedSection const **pickedSection = nextSection(&section, &zeroLenSection);
 		struct Section const *sect = (*pickedSection)->section;
 
 		slack -= sect->size;
 
 		if (sect->size != 0)
-			fprintf(mapFile, "  SECTION: $%04" PRIx16 "-$%04" PRIx16 " ($%04" PRIx16 " byte%s) [\"%s\"]\n",
-				sect->org, sect->org + sect->size - 1,
-				sect->size, sect->size == 1 ? "" : "s",
-				sect->name);
+			fprintf(mapFile,
+			        "  SECTION: $%04" PRIx16 "-$%04" PRIx16 " ($%04" PRIx16
+			        " byte%s) [\"%s\"]\n",
+			        sect->org, sect->org + sect->size - 1, sect->size,
+			        sect->size == 1 ? "" : "s", sect->name);
 		else
 			fprintf(mapFile, "  SECTION: $%04" PRIx16 " (0 bytes) [\"%s\"]\n",
-				sect->org, sect->name);
+			        sect->org, sect->name);
 
 		for (size_t i = 0; i < sect->nbSymbols; i++)
 			fprintf(mapFile, "           $%04" PRIx32 " = %s\n",
-				sect->symbols[i]->offset + sect->org,
-				sect->symbols[i]->name);
+			        sect->symbols[i]->offset + sect->org, sect->symbols[i]->name);
 
 		*pickedSection = (*pickedSection)->next;
 	}
@@ -339,7 +308,7 @@ static void writeMapBank(struct SortedSections const *sectList,
 		fputs("  EMPTY\n\n", mapFile);
 	else
 		fprintf(mapFile, "    SLACK: $%04" PRIx16 " byte%s\n\n", slack,
-			slack == 1 ? "" : "s");
+		        slack == 1 ? "" : "s");
 }
 
 /**
@@ -350,16 +319,9 @@ static void writeSymAndMap(void)
 	if (!symFileName && !mapFileName)
 		return;
 
-	enum SectionType typeMap[SECTTYPE_INVALID] = {
-		SECTTYPE_ROM0,
-		SECTTYPE_ROMX,
-		SECTTYPE_VRAM,
-		SECTTYPE_SRAM,
-		SECTTYPE_WRAM0,
-		SECTTYPE_WRAMX,
-		SECTTYPE_OAM,
-		SECTTYPE_HRAM
-	};
+	enum SectionType typeMap[SECTTYPE_INVALID] = {SECTTYPE_ROM0, SECTTYPE_ROMX,  SECTTYPE_VRAM,
+	                                              SECTTYPE_SRAM, SECTTYPE_WRAM0, SECTTYPE_WRAMX,
+	                                              SECTTYPE_OAM,  SECTTYPE_HRAM};
 
 	symFile = openFile(symFileName, "w");
 	mapFile = openFile(mapFileName, "w");
@@ -371,11 +333,9 @@ static void writeSymAndMap(void)
 		enum SectionType type = typeMap[i];
 
 		if (sections[type].nbBanks > 0) {
-			for (uint32_t bank = 0; bank < sections[type].nbBanks;
-			     bank++) {
+			for (uint32_t bank = 0; bank < sections[type].nbBanks; bank++) {
 				writeSymBank(&sections[type].banks[bank]);
-				writeMapBank(&sections[type].banks[bank],
-					     type, bank);
+				writeMapBank(&sections[type].banks[bank], type, bank);
 			}
 		}
 	}
@@ -399,8 +359,7 @@ static void cleanup(void)
 	for (enum SectionType type = 0; type < SECTTYPE_INVALID; type++) {
 		if (sections[type].nbBanks > 0) {
 			for (uint32_t i = 0; i < sections[type].nbBanks; i++) {
-				struct SortedSections *bank =
-					&sections[type].banks[i];
+				struct SortedSections *bank = &sections[type].banks[i];
 
 				cleanupSections(bank->sections);
 				cleanupSections(bank->zeroLenSections);

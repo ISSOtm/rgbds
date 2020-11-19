@@ -7,7 +7,9 @@
  */
 
 #include <sys/types.h>
+
 #include <sys/stat.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -20,69 +22,74 @@
 #include <stdlib.h>
 #include <string.h>
 #ifndef _MSC_VER
-#include <unistd.h>
+	#include <unistd.h>
 #endif
 
-#include "extern/utf8decoder.h"
-#include "platform.h" /* For `ssize_t` */
-
 #include "asm/asm.h"
-#include "asm/lexer.h"
 #include "asm/fstack.h"
+#include "asm/lexer.h"
 #include "asm/macro.h"
 #include "asm/main.h"
 #include "asm/rpn.h"
 #include "asm/symbol.h"
 #include "asm/util.h"
 #include "asm/warning.h"
+#include "extern/utf8decoder.h"
+#include "platform.h" /* For `ssize_t` */
 /* Include this last so it gets all type & constant definitions */
 #include "parser.h" /* For token definitions, generated from parser.y */
 
 #ifdef LEXER_DEBUG
-  #define dbgPrint(...) fprintf(stderr, "[lexer] " __VA_ARGS__)
+	#define dbgPrint(...) fprintf(stderr, "[lexer] " __VA_ARGS__)
 #else
-  #define dbgPrint(...)
+	#define dbgPrint(...)
 #endif
 
 /* Neither MSVC nor MinGW provide `mmap` */
 #if defined(_MSC_VER) || defined(__MINGW32__)
-# include <windows.h>
-# include <fileapi.h>
-# include <winbase.h>
-# define MAP_FAILED NULL
-# define mapFile(ptr, fd, path, size) do { \
-	(ptr) = MAP_FAILED; \
-	HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, \
-				  FILE_FLAG_POSIX_SEMANTICS | FILE_FLAG_RANDOM_ACCESS, NULL); \
-	HANDLE mappingObj; \
-	\
-	if (file == INVALID_HANDLE_VALUE) \
-		break; \
-	mappingObj  = CreateFileMappingA(file, NULL, PAGE_READONLY, 0, 0, NULL); \
-	if (mappingObj != INVALID_HANDLE_VALUE) \
-		(ptr) = MapViewOfFile(mappingObj, FILE_MAP_READ, 0, 0, 0); \
-	CloseHandle(mappingObj); \
-	CloseHandle(file); \
-} while (0)
-# define munmap(ptr, size)  UnmapViewOfFile((ptr))
+	#include <fileapi.h>
+	#include <winbase.h>
+	#include <windows.h>
+	#define MAP_FAILED NULL
+	#define mapFile(ptr, fd, path, size)                                                    \
+		do {                                                                            \
+			(ptr) = MAP_FAILED;                                                     \
+			HANDLE file = CreateFileA(                                              \
+			    path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,           \
+			    FILE_FLAG_POSIX_SEMANTICS | FILE_FLAG_RANDOM_ACCESS, NULL);         \
+			HANDLE mappingObj;                                                      \
+                                                                                                \
+			if (file == INVALID_HANDLE_VALUE)                                       \
+				break;                                                          \
+			mappingObj = CreateFileMappingA(file, NULL, PAGE_READONLY, 0, 0, NULL); \
+			if (mappingObj != INVALID_HANDLE_VALUE)                                 \
+				(ptr) = MapViewOfFile(mappingObj, FILE_MAP_READ, 0, 0, 0);      \
+			CloseHandle(mappingObj);                                                \
+			CloseHandle(file);                                                      \
+		} while (0)
+	#define munmap(ptr, size) UnmapViewOfFile((ptr))
 
 #else /* defined(_MSC_VER) || defined(__MINGW32__) */
 
-# include <sys/mman.h>
-# define mapFile(ptr, fd, path, size) do { \
-	(ptr) = mmap(NULL, (size), PROT_READ, MAP_PRIVATE, (fd), 0); \
-	\
-	if ((ptr) == MAP_FAILED && errno == ENOTSUP) { \
-		/*
-		 * The implementation may not support MAP_PRIVATE; try again with MAP_SHARED
-		 * instead, offering, I believe, weaker guarantees about external modifications to
-		 * the file while reading it. That's still better than not opening it at all, though
-		 */ \
-		if (verbose) \
-			printf("mmap(%s, MAP_PRIVATE) failed, retrying with MAP_SHARED\n", path); \
-		(ptr) = mmap(NULL, (size), PROT_READ, MAP_SHARED, (fd), 0); \
-	} \
-} while (0)
+	#include <sys/mman.h>
+	#define mapFile(ptr, fd, path, size)                                                            \
+		do {                                                                                    \
+			(ptr) = mmap(NULL, (size), PROT_READ, MAP_PRIVATE, (fd), 0);                    \
+                                                                                                        \
+			if ((ptr) == MAP_FAILED && errno == ENOTSUP) {                                  \
+				/*                                                                      \
+				 * The implementation may not support MAP_PRIVATE; try again with       \
+				 * MAP_SHARED instead, offering, I believe, weaker guarantees           \
+				 * about external modifications to the file while reading it.           \
+				 * That's still better than not opening it at all, though               \
+				 */                                                                     \
+				if (verbose)                                                            \
+					printf(                                                         \
+					    "mmap(%s, MAP_PRIVATE) failed, retrying with MAP_SHARED\n", \
+					    path);                                                      \
+				(ptr) = mmap(NULL, (size), PROT_READ, MAP_SHARED, (fd), 0);             \
+			}                                                                               \
+		} while (0)
 #endif /* !( defined(_MSC_VER) || defined(__MINGW32__) ) */
 
 /*
@@ -95,186 +102,185 @@ static struct KeywordMapping {
 	char const *name;
 	int token;
 } const keywords[] = {
-	/*
-	 * CAUTION when editing this: adding keywords will probably require extra nodes in the
-	 * `keywordDict` array. If you forget to, you will probably trip up an assertion, anyways.
-	 * Also, all entries in this array must be in uppercase for the dict to build correctly.
-	 */
-	{"ADC", T_Z80_ADC},
-	{"ADD", T_Z80_ADD},
-	{"AND", T_Z80_AND},
-	{"BIT", T_Z80_BIT},
-	{"CALL", T_Z80_CALL},
-	{"CCF", T_Z80_CCF},
-	{"CPL", T_Z80_CPL},
-	{"CP", T_Z80_CP},
-	{"DAA", T_Z80_DAA},
-	{"DEC", T_Z80_DEC},
-	{"DI", T_Z80_DI},
-	{"EI", T_Z80_EI},
-	{"HALT", T_Z80_HALT},
-	{"INC", T_Z80_INC},
-	{"JP", T_Z80_JP},
-	{"JR", T_Z80_JR},
-	{"LD", T_Z80_LD},
-	{"LDI", T_Z80_LDI},
-	{"LDD", T_Z80_LDD},
-	{"LDIO", T_Z80_LDIO},
-	{"LDH", T_Z80_LDIO},
-	{"NOP", T_Z80_NOP},
-	{"OR", T_Z80_OR},
-	{"POP", T_Z80_POP},
-	{"PUSH", T_Z80_PUSH},
-	{"RES", T_Z80_RES},
-	{"RETI", T_Z80_RETI},
-	{"RET", T_Z80_RET},
-	{"RLCA", T_Z80_RLCA},
-	{"RLC", T_Z80_RLC},
-	{"RLA", T_Z80_RLA},
-	{"RL", T_Z80_RL},
-	{"RRC", T_Z80_RRC},
-	{"RRCA", T_Z80_RRCA},
-	{"RRA", T_Z80_RRA},
-	{"RR", T_Z80_RR},
-	{"RST", T_Z80_RST},
-	{"SBC", T_Z80_SBC},
-	{"SCF", T_Z80_SCF},
-	{"SET", T_POP_SET},
-	{"SLA", T_Z80_SLA},
-	{"SRA", T_Z80_SRA},
-	{"SRL", T_Z80_SRL},
-	{"STOP", T_Z80_STOP},
-	{"SUB", T_Z80_SUB},
-	{"SWAP", T_Z80_SWAP},
-	{"XOR", T_Z80_XOR},
+    /*
+     * CAUTION when editing this: adding keywords will probably require extra nodes in the
+     * `keywordDict` array. If you forget to, you will probably trip up an assertion, anyways.
+     * Also, all entries in this array must be in uppercase for the dict to build correctly.
+     */
+    {"ADC", T_Z80_ADC},
+    {"ADD", T_Z80_ADD},
+    {"AND", T_Z80_AND},
+    {"BIT", T_Z80_BIT},
+    {"CALL", T_Z80_CALL},
+    {"CCF", T_Z80_CCF},
+    {"CPL", T_Z80_CPL},
+    {"CP", T_Z80_CP},
+    {"DAA", T_Z80_DAA},
+    {"DEC", T_Z80_DEC},
+    {"DI", T_Z80_DI},
+    {"EI", T_Z80_EI},
+    {"HALT", T_Z80_HALT},
+    {"INC", T_Z80_INC},
+    {"JP", T_Z80_JP},
+    {"JR", T_Z80_JR},
+    {"LD", T_Z80_LD},
+    {"LDI", T_Z80_LDI},
+    {"LDD", T_Z80_LDD},
+    {"LDIO", T_Z80_LDIO},
+    {"LDH", T_Z80_LDIO},
+    {"NOP", T_Z80_NOP},
+    {"OR", T_Z80_OR},
+    {"POP", T_Z80_POP},
+    {"PUSH", T_Z80_PUSH},
+    {"RES", T_Z80_RES},
+    {"RETI", T_Z80_RETI},
+    {"RET", T_Z80_RET},
+    {"RLCA", T_Z80_RLCA},
+    {"RLC", T_Z80_RLC},
+    {"RLA", T_Z80_RLA},
+    {"RL", T_Z80_RL},
+    {"RRC", T_Z80_RRC},
+    {"RRCA", T_Z80_RRCA},
+    {"RRA", T_Z80_RRA},
+    {"RR", T_Z80_RR},
+    {"RST", T_Z80_RST},
+    {"SBC", T_Z80_SBC},
+    {"SCF", T_Z80_SCF},
+    {"SET", T_POP_SET},
+    {"SLA", T_Z80_SLA},
+    {"SRA", T_Z80_SRA},
+    {"SRL", T_Z80_SRL},
+    {"STOP", T_Z80_STOP},
+    {"SUB", T_Z80_SUB},
+    {"SWAP", T_Z80_SWAP},
+    {"XOR", T_Z80_XOR},
 
-	{"NZ", T_CC_NZ},
-	{"Z", T_CC_Z},
-	{"NC", T_CC_NC},
-	/* Handled in list of registers */
-	/* { "C", T_CC_C }, */
+    {"NZ", T_CC_NZ},
+    {"Z", T_CC_Z},
+    {"NC", T_CC_NC},
+    /* Handled in list of registers */
+    /* { "C", T_CC_C }, */
 
-	{"AF", T_MODE_AF},
-	{"BC", T_MODE_BC},
-	{"DE", T_MODE_DE},
-	{"HL", T_MODE_HL},
-	{"SP", T_MODE_SP},
-	{"HLD", T_MODE_HL_DEC},
-	{"HLI", T_MODE_HL_INC},
+    {"AF", T_MODE_AF},
+    {"BC", T_MODE_BC},
+    {"DE", T_MODE_DE},
+    {"HL", T_MODE_HL},
+    {"SP", T_MODE_SP},
+    {"HLD", T_MODE_HL_DEC},
+    {"HLI", T_MODE_HL_INC},
 
-	{"A", T_TOKEN_A},
-	{"B", T_TOKEN_B},
-	{"C", T_TOKEN_C},
-	{"D", T_TOKEN_D},
-	{"E", T_TOKEN_E},
-	{"H", T_TOKEN_H},
-	{"L", T_TOKEN_L},
+    {"A", T_TOKEN_A},
+    {"B", T_TOKEN_B},
+    {"C", T_TOKEN_C},
+    {"D", T_TOKEN_D},
+    {"E", T_TOKEN_E},
+    {"H", T_TOKEN_H},
+    {"L", T_TOKEN_L},
 
-	{"DEF", T_OP_DEF},
+    {"DEF", T_OP_DEF},
 
-	{"FRAGMENT", T_POP_FRAGMENT},
-	{"BANK", T_OP_BANK},
-	{"ALIGN", T_OP_ALIGN},
+    {"FRAGMENT", T_POP_FRAGMENT},
+    {"BANK", T_OP_BANK},
+    {"ALIGN", T_OP_ALIGN},
 
-	{"ROUND", T_OP_ROUND},
-	{"CEIL", T_OP_CEIL},
-	{"FLOOR", T_OP_FLOOR},
-	{"DIV", T_OP_FDIV},
-	{"MUL", T_OP_FMUL},
-	{"SIN", T_OP_SIN},
-	{"COS", T_OP_COS},
-	{"TAN", T_OP_TAN},
-	{"ASIN", T_OP_ASIN},
-	{"ACOS", T_OP_ACOS},
-	{"ATAN", T_OP_ATAN},
-	{"ATAN2", T_OP_ATAN2},
+    {"ROUND", T_OP_ROUND},
+    {"CEIL", T_OP_CEIL},
+    {"FLOOR", T_OP_FLOOR},
+    {"DIV", T_OP_FDIV},
+    {"MUL", T_OP_FMUL},
+    {"SIN", T_OP_SIN},
+    {"COS", T_OP_COS},
+    {"TAN", T_OP_TAN},
+    {"ASIN", T_OP_ASIN},
+    {"ACOS", T_OP_ACOS},
+    {"ATAN", T_OP_ATAN},
+    {"ATAN2", T_OP_ATAN2},
 
-	{"HIGH", T_OP_HIGH},
-	{"LOW", T_OP_LOW},
-	{"ISCONST", T_OP_ISCONST},
+    {"HIGH", T_OP_HIGH},
+    {"LOW", T_OP_LOW},
+    {"ISCONST", T_OP_ISCONST},
 
-	{"STRCMP", T_OP_STRCMP},
-	{"STRIN", T_OP_STRIN},
-	{"STRSUB", T_OP_STRSUB},
-	{"STRLEN", T_OP_STRLEN},
-	{"STRCAT", T_OP_STRCAT},
-	{"STRUPR", T_OP_STRUPR},
-	{"STRLWR", T_OP_STRLWR},
+    {"STRCMP", T_OP_STRCMP},
+    {"STRIN", T_OP_STRIN},
+    {"STRSUB", T_OP_STRSUB},
+    {"STRLEN", T_OP_STRLEN},
+    {"STRCAT", T_OP_STRCAT},
+    {"STRUPR", T_OP_STRUPR},
+    {"STRLWR", T_OP_STRLWR},
 
-	{"INCLUDE", T_POP_INCLUDE},
-	{"PRINTT", T_POP_PRINTT},
-	{"PRINTI", T_POP_PRINTI},
-	{"PRINTV", T_POP_PRINTV},
-	{"PRINTF", T_POP_PRINTF},
-	{"EXPORT", T_POP_EXPORT},
-	{"XDEF", T_POP_XDEF},
-	{"GLOBAL", T_POP_GLOBAL},
-	{"DS", T_POP_DS},
-	{"DB", T_POP_DB},
-	{"DW", T_POP_DW},
-	{"DL", T_POP_DL},
-	{"SECTION", T_POP_SECTION},
-	{"PURGE", T_POP_PURGE},
+    {"INCLUDE", T_POP_INCLUDE},
+    {"PRINTT", T_POP_PRINTT},
+    {"PRINTI", T_POP_PRINTI},
+    {"PRINTV", T_POP_PRINTV},
+    {"PRINTF", T_POP_PRINTF},
+    {"EXPORT", T_POP_EXPORT},
+    {"XDEF", T_POP_XDEF},
+    {"GLOBAL", T_POP_GLOBAL},
+    {"DS", T_POP_DS},
+    {"DB", T_POP_DB},
+    {"DW", T_POP_DW},
+    {"DL", T_POP_DL},
+    {"SECTION", T_POP_SECTION},
+    {"PURGE", T_POP_PURGE},
 
-	{"RSRESET", T_POP_RSRESET},
-	{"RSSET", T_POP_RSSET},
+    {"RSRESET", T_POP_RSRESET},
+    {"RSSET", T_POP_RSSET},
 
-	{"INCBIN", T_POP_INCBIN},
-	{"CHARMAP", T_POP_CHARMAP},
-	{"NEWCHARMAP", T_POP_NEWCHARMAP},
-	{"SETCHARMAP", T_POP_SETCHARMAP},
-	{"PUSHC", T_POP_PUSHC},
-	{"POPC", T_POP_POPC},
+    {"INCBIN", T_POP_INCBIN},
+    {"CHARMAP", T_POP_CHARMAP},
+    {"NEWCHARMAP", T_POP_NEWCHARMAP},
+    {"SETCHARMAP", T_POP_SETCHARMAP},
+    {"PUSHC", T_POP_PUSHC},
+    {"POPC", T_POP_POPC},
 
-	{"FAIL", T_POP_FAIL},
-	{"WARN", T_POP_WARN},
-	{"FATAL", T_POP_FATAL},
-	{"ASSERT", T_POP_ASSERT},
-	{"STATIC_ASSERT", T_POP_STATIC_ASSERT},
+    {"FAIL", T_POP_FAIL},
+    {"WARN", T_POP_WARN},
+    {"FATAL", T_POP_FATAL},
+    {"ASSERT", T_POP_ASSERT},
+    {"STATIC_ASSERT", T_POP_STATIC_ASSERT},
 
-	{"MACRO", T_POP_MACRO},
-	{"ENDM", T_POP_ENDM},
-	{"SHIFT", T_POP_SHIFT},
+    {"MACRO", T_POP_MACRO},
+    {"ENDM", T_POP_ENDM},
+    {"SHIFT", T_POP_SHIFT},
 
-	{"REPT", T_POP_REPT},
-	{"ENDR", T_POP_ENDR},
+    {"REPT", T_POP_REPT},
+    {"ENDR", T_POP_ENDR},
 
-	{"LOAD", T_POP_LOAD},
-	{"ENDL", T_POP_ENDL},
+    {"LOAD", T_POP_LOAD},
+    {"ENDL", T_POP_ENDL},
 
-	{"IF", T_POP_IF},
-	{"ELSE", T_POP_ELSE},
-	{"ELIF", T_POP_ELIF},
-	{"ENDC", T_POP_ENDC},
+    {"IF", T_POP_IF},
+    {"ELSE", T_POP_ELSE},
+    {"ELIF", T_POP_ELIF},
+    {"ENDC", T_POP_ENDC},
 
-	{"UNION", T_POP_UNION},
-	{"NEXTU", T_POP_NEXTU},
-	{"ENDU", T_POP_ENDU},
+    {"UNION", T_POP_UNION},
+    {"NEXTU", T_POP_NEXTU},
+    {"ENDU", T_POP_ENDU},
 
-	{"WRAM0", T_SECT_WRAM0},
-	{"VRAM", T_SECT_VRAM},
-	{"ROMX", T_SECT_ROMX},
-	{"ROM0", T_SECT_ROM0},
-	{"HRAM", T_SECT_HRAM},
-	{"WRAMX", T_SECT_WRAMX},
-	{"SRAM", T_SECT_SRAM},
-	{"OAM", T_SECT_OAM},
+    {"WRAM0", T_SECT_WRAM0},
+    {"VRAM", T_SECT_VRAM},
+    {"ROMX", T_SECT_ROMX},
+    {"ROM0", T_SECT_ROM0},
+    {"HRAM", T_SECT_HRAM},
+    {"WRAMX", T_SECT_WRAMX},
+    {"SRAM", T_SECT_SRAM},
+    {"OAM", T_SECT_OAM},
 
-	{"RB", T_POP_RB},
-	{"RW", T_POP_RW},
-	{"EQU", T_POP_EQU},
-	{"EQUS", T_POP_EQUS},
+    {"RB", T_POP_RB},
+    {"RW", T_POP_RW},
+    {"EQU", T_POP_EQU},
+    {"EQUS", T_POP_EQUS},
 
-	/*  Handled before in list of CPU instructions */
-	/* {"SET", T_POP_SET}, */
+    /*  Handled before in list of CPU instructions */
+    /* {"SET", T_POP_SET}, */
 
-	{"PUSHS", T_POP_PUSHS},
-	{"POPS", T_POP_POPS},
-	{"PUSHO", T_POP_PUSHO},
-	{"POPO", T_POP_POPO},
+    {"PUSHS", T_POP_PUSHS},
+    {"POPS", T_POP_POPS},
+    {"PUSHO", T_POP_PUSHO},
+    {"POPO", T_POP_POPO},
 
-	{"OPT", T_POP_OPT}
-};
+    {"OPT", T_POP_OPT}};
 
 static bool isWhitespace(int c)
 {
@@ -293,7 +299,7 @@ struct Expansion {
 	size_t len;
 	size_t totalLen;
 	size_t distance; /* Distance between the beginning of this expansion and of its parent */
-	uint8_t skip; /* How many extra characters to skip after the expansion is over */
+	uint8_t skip;    /* How many extra characters to skip after the expansion is over */
 };
 
 struct LexerState {
@@ -302,7 +308,7 @@ struct LexerState {
 	/* mmap()-dependent IO state */
 	bool isMmapped;
 	union {
-		struct { /* If mmap()ed */
+		struct {           /* If mmap()ed */
 			char *ptr; /* Technically `const` during the lexer's execution */
 			off_t size;
 			off_t offset;
@@ -310,9 +316,9 @@ struct LexerState {
 		};
 		struct { /* Otherwise */
 			int fd;
-			size_t index; /* Read index into the buffer */
+			size_t index;             /* Read index into the buffer */
 			char buf[LEXER_BUF_SIZE]; /* Circular buffer */
-			size_t nbChars; /* Number of "fresh" chars in the buffer */
+			size_t nbChars;           /* Number of "fresh" chars in the buffer */
 		};
 	};
 
@@ -325,9 +331,9 @@ struct LexerState {
 	uint32_t colNo;
 	int lastToken;
 
-	bool capturing; /* Whether the text being lexed should be captured */
-	size_t captureSize; /* Amount of text captured */
-	char *captureBuf; /* Buffer to send the captured text to if non-NULL */
+	bool capturing;         /* Whether the text being lexed should be captured */
+	size_t captureSize;     /* Amount of text captured */
+	char *captureBuf;       /* Buffer to send the captured text to if non-NULL */
 	size_t captureCapacity; /* Size of the buffer above */
 
 	bool disableMacroArgs;
@@ -410,8 +416,8 @@ struct LexerState *lexer_OpenFile(char const *path)
 	if (!state->isMmapped) {
 		/* Sometimes mmap() fails or isn't available, so have a fallback */
 		if (verbose)
-			printf("File %s opened as regular, errno reports \"%s\"\n",
-			       path, strerror(errno));
+			printf("File %s opened as regular, errno reports \"%s\"\n", path,
+			       strerror(errno));
 		state->index = 0;
 		state->nbChars = 0;
 	}
@@ -471,7 +477,8 @@ struct KeywordDictNode {
 	 */
 	uint16_t children[0x60 - ' '];
 	struct KeywordMapping const *keyword;
-/* Since the keyword structure is invariant, the min number of nodes is known at compile time */
+	/* Since the keyword structure is invariant, the min number of nodes is known at compile
+	 * time */
 } keywordDict[338] = {0}; /* Make sure to keep this correct when adding keywords! */
 
 /* Convert a char into its index into the dict */
@@ -563,33 +570,35 @@ static void reallocCaptureBuf(void)
  * This is necessary because there are at least 3 places which need to iterate
  * through iterations while performing custom actions
  */
-#define lookupExpansion(retvar, dist) do { \
-	struct Expansion *exp = lexerState->expansions; \
-	\
-	for (;;) { \
-		/* Find the closest expansion whose end is after the target */ \
-		while (exp && exp->totalLen + exp->distance <= (dist)) { \
-			(dist) -= exp->totalLen + exp->skip; \
-			exp = exp->next; \
-		} \
-		\
-		/* If there is none, or it begins after the target, return the previous level */ \
-		if (!exp || exp->distance > (dist)) \
-			break; \
-		\
-		/* We know we are inside of that expansion */ \
-		(dist) -= exp->distance; /* Distances are relative to their parent */ \
-		\
-		/* Otherwise, register this expansion and repeat the process */ \
-		LOOKUP_PRE_NEST(exp); \
-		(retvar) = exp; \
-		if (!exp->firstChild) /* If there are no children, this is it */ \
-			break; \
-		exp = exp->firstChild; \
-		\
-		LOOKUP_POST_NEST(exp); \
-	} \
-} while (0)
+#define lookupExpansion(retvar, dist)                                                           \
+	do {                                                                                    \
+		struct Expansion *exp = lexerState->expansions;                                 \
+                                                                                                \
+		for (;;) {                                                                      \
+			/* Find the closest expansion whose end is after the target */          \
+			while (exp && exp->totalLen + exp->distance <= (dist)) {                \
+				(dist) -= exp->totalLen + exp->skip;                            \
+				exp = exp->next;                                                \
+			}                                                                       \
+                                                                                                \
+			/* If there is none, or it begins after the target, return the previous \
+			 * level */                                                             \
+			if (!exp || exp->distance > (dist))                                     \
+				break;                                                          \
+                                                                                                \
+			/* We know we are inside of that expansion */                           \
+			(dist) -= exp->distance; /* Distances are relative to their parent */   \
+                                                                                                \
+			/* Otherwise, register this expansion and repeat the process */         \
+			LOOKUP_PRE_NEST(exp);                                                   \
+			(retvar) = exp;                                                         \
+			if (!exp->firstChild) /* If there are no children, this is it */        \
+				break;                                                          \
+			exp = exp->firstChild;                                                  \
+                                                                                                \
+			LOOKUP_POST_NEST(exp);                                                  \
+		}                                                                               \
+	} while (0)
 
 static struct Expansion *getExpansionAtDistance(size_t *distance)
 {
@@ -628,8 +637,8 @@ static struct Expansion *getExpansionAtDistance(size_t *distance)
 	return expansion;
 }
 
-static void beginExpansion(size_t distance, uint8_t skip,
-			   char const *str, size_t size, char const *name)
+static void beginExpansion(size_t distance, uint8_t skip, char const *str, size_t size,
+                           char const *name)
 {
 	distance += lexerState->expansionOfs; /* Distance argument is relative to read offset! */
 	/* Increase the total length of all parents, and return the topmost one */
@@ -637,10 +646,11 @@ static void beginExpansion(size_t distance, uint8_t skip,
 	unsigned int depth = 0;
 
 #define LOOKUP_PRE_NEST(exp) (exp)->totalLen += size - skip
-#define LOOKUP_POST_NEST(exp) do { \
-	if (name && ++depth >= nMaxRecursionDepth) \
-		fatalerror("Recursion limit (%u) exceeded\n", nMaxRecursionDepth); \
-} while (0)
+#define LOOKUP_POST_NEST(exp)                                                              \
+	do {                                                                               \
+		if (name && ++depth >= nMaxRecursionDepth)                                 \
+			fatalerror("Recursion limit (%u) exceeded\n", nMaxRecursionDepth); \
+	} while (0)
 	lookupExpansion(parent, distance);
 #undef LOOKUP_PRE_NEST
 #undef LOOKUP_POST_NEST
@@ -702,8 +712,9 @@ static char const *expandMacroArg(char name, size_t distance)
 static int peekInternal(uint8_t distance)
 {
 	if (distance >= LEXER_BUF_SIZE)
-		fatalerror("Internal lexer error: buffer has insufficient size for peeking (%"
-			   PRIu8 " >= %u)\n", distance, LEXER_BUF_SIZE);
+		fatalerror("Internal lexer error: buffer has insufficient size for peeking (%" PRIu8
+		           " >= %u)\n",
+		           distance, LEXER_BUF_SIZE);
 
 	size_t ofs = lexerState->expansionOfs + distance;
 	struct Expansion const *expansion = getExpansionAtDistance(&ofs);
@@ -730,18 +741,19 @@ static int peekInternal(uint8_t distance)
 		size_t writeIndex = (lexerState->index + lexerState->nbChars) % LEXER_BUF_SIZE;
 		ssize_t nbCharsRead = 0, totalCharsRead = 0;
 
-#define readChars(size) do { \
-	/* This buffer overflow made me lose WEEKS of my life. Never again. */ \
-	assert(writeIndex + (size) <= LEXER_BUF_SIZE); \
-	nbCharsRead = read(lexerState->fd, &lexerState->buf[writeIndex], (size)); \
-	if (nbCharsRead == -1) \
-		fatalerror("Error while reading \"%s\": %s\n", lexerState->path, errno); \
-	totalCharsRead += nbCharsRead; \
-	writeIndex += nbCharsRead; \
-	if (writeIndex == LEXER_BUF_SIZE) \
-		writeIndex = 0; \
-	target -= nbCharsRead; \
-} while (0)
+#define readChars(size)                                                                          \
+	do {                                                                                     \
+		/* This buffer overflow made me lose WEEKS of my life. Never again. */           \
+		assert(writeIndex + (size) <= LEXER_BUF_SIZE);                                   \
+		nbCharsRead = read(lexerState->fd, &lexerState->buf[writeIndex], (size));        \
+		if (nbCharsRead == -1)                                                           \
+			fatalerror("Error while reading \"%s\": %s\n", lexerState->path, errno); \
+		totalCharsRead += nbCharsRead;                                                   \
+		writeIndex += nbCharsRead;                                                       \
+		if (writeIndex == LEXER_BUF_SIZE)                                                \
+			writeIndex = 0;                                                          \
+		target -= nbCharsRead;                                                           \
+	} while (0)
 
 		/* If the range to fill passes over the buffer wrapping point, we need two reads */
 		if (writeIndex + target > LEXER_BUF_SIZE) {
@@ -905,11 +917,12 @@ void lexer_DumpStringExpansions(void)
 	if (!stack)
 		fatalerror("Failed to alloc string expansion stack: %s\n", strerror(errno));
 
-#define LOOKUP_PRE_NEST(exp) do { \
-	/* Only register EQUS expansions, not string args */ \
-	if ((exp)->name) \
-		stack[depth++] = (exp); \
-} while (0)
+#define LOOKUP_PRE_NEST(exp)                                         \
+	do {                                                         \
+		/* Only register EQUS expansions, not string args */ \
+		if ((exp)->name)                                     \
+			stack[depth++] = (exp);                      \
+	} while (0)
 #define LOOKUP_POST_NEST(exp)
 	lookupExpansion(expansion, distance);
 	(void)expansion;
@@ -932,8 +945,7 @@ static void discardBlockComment(void)
 			return;
 		case '/':
 			if (peek(0) == '*') {
-				warning(WARNING_NESTED_COMMENT,
-					"/* in block comment\n");
+				warning(WARNING_NESTED_COMMENT, "/* in block comment\n");
 			}
 			continue;
 		case '*':
@@ -978,8 +990,7 @@ static void readLineContinuation(void)
 			shiftChars(1);
 			if (c == '\r' && peek(0) == '\n')
 				shiftChars(1);
-			if (!lexerState->expansions
-			 || lexerState->expansions->distance)
+			if (!lexerState->expansions || lexerState->expansions->distance)
 				lexerState->lineNo++;
 			return;
 		} else if (c == ';') {
@@ -1026,7 +1037,7 @@ static void readFractionalPart(void)
 		shiftChars(1);
 		if (divisor > (UINT32_MAX - (c - '0')) / 10) {
 			warning(WARNING_LARGE_CONSTANT,
-				"Precision of fixed-point constant is too large\n");
+			        "Precision of fixed-point constant is too large\n");
 			/* Discard any additional digits */
 			while (c = peek(0), c >= '0' && c <= '9')
 				shiftChars(1);
@@ -1113,8 +1124,8 @@ static void readGfxConstant(void)
 	uint32_t bp0 = 0, bp1 = 0;
 	uint8_t width = 0;
 
-	dbgPrint("Reading gfx constant with digits [%c,%c,%c,%c]\n",
-		 gfxDigits[0], gfxDigits[1], gfxDigits[2], gfxDigits[3]);
+	dbgPrint("Reading gfx constant with digits [%c,%c,%c,%c]\n", gfxDigits[0], gfxDigits[1],
+	         gfxDigits[2], gfxDigits[3]);
 	for (;;) {
 		int c = peek(0);
 		uint32_t pixel;
@@ -1143,7 +1154,7 @@ static void readGfxConstant(void)
 		error("Invalid graphics constant, no digits after '`'\n");
 	else if (width == 9)
 		warning(WARNING_LARGE_CONSTANT,
-			"Graphics constant is too long, only 8 first pixels considered\n");
+		        "Graphics constant is too long, only 8 first pixels considered\n");
 
 	yylval.nConstValue = bp1 << 8 | bp0;
 }
@@ -1164,14 +1175,12 @@ static int readIdentifier(char firstChar)
 	int tokenType = firstChar == '.' ? T_LOCAL_ID : T_ID;
 	size_t i;
 
-	for (i = 1; ; i++) {
+	for (i = 1;; i++) {
 		int c = peek(0);
 
 		/* If that char isn't in the symbol charset, end */
-		if ((c > '9' || c < '0')
-		 && (c > 'Z' || c < 'A')
-		 && (c > 'z' || c < 'a')
-		 && c != '#' && c != '.' && c != '@' && c != '_')
+		if ((c > '9' || c < '0') && (c > 'Z' || c < 'A') && (c > 'z' || c < 'a') && c != '#'
+		    && c != '.' && c != '@' && c != '_')
 			break;
 		shiftChars(1);
 
@@ -1203,7 +1212,8 @@ static int readIdentifier(char firstChar)
 
 /* Functions to read strings */
 
-enum PrintType {
+enum PrintType
+{
 	TYPE_NONE,
 	TYPE_DECIMAL,  /* d */
 	TYPE_UPPERHEX, /* X */
@@ -1230,12 +1240,10 @@ static void intToString(char *dest, size_t bufSize, struct Symbol const *sym, en
 		} while (value);
 		strncpy(dest, write_ptr, bufSize - 1);
 	} else {
-		static char const * const formats[] = {
-			[TYPE_NONE]     = "$%" PRIX32,
-			[TYPE_DECIMAL]  = "%" PRId32,
-			[TYPE_UPPERHEX] = "%" PRIX32,
-			[TYPE_LOWERHEX] = "%" PRIx32
-		};
+		static char const *const formats[] = {[TYPE_NONE] = "$%" PRIX32,
+		                                      [TYPE_DECIMAL] = "%" PRId32,
+		                                      [TYPE_UPPERHEX] = "%" PRIX32,
+		                                      [TYPE_LOWERHEX] = "%" PRIx32};
 
 		fullLength = snprintf(dest, bufSize, formats[type], value);
 		if (fullLength < 0) {
@@ -1246,7 +1254,7 @@ static void intToString(char *dest, size_t bufSize, struct Symbol const *sym, en
 
 	if ((size_t)fullLength >= bufSize)
 		warning(WARNING_LONG_STR, "Interpolated symbol %s too long to fit buffer\n",
-			sym->name);
+		        sym->name);
 }
 
 static char const *readInterpolation(void)
@@ -1413,7 +1421,7 @@ static void readString(void)
 			}
 			continue; /* Do not copy an additional character */
 
-		/* Regular characters will just get copied */
+			/* Regular characters will just get copied */
 		}
 		if (i < sizeof(yylval.tzString)) /* Copy one extra to flag overflow */
 			yylval.tzString[i++] = c;
@@ -1474,19 +1482,19 @@ static char const *reportGarbageChar(unsigned char firstByte)
 
 static int yylex_NORMAL(void)
 {
-	dbgPrint("Lexing in normal mode, line=%" PRIu32 ", col=%" PRIu32 "\n",
-		 lexer_GetLineNo(), lexer_GetColNo());
+	dbgPrint("Lexing in normal mode, line=%" PRIu32 ", col=%" PRIu32 "\n", lexer_GetLineNo(),
+	         lexer_GetColNo());
 	for (;;) {
 		int c = nextChar();
 
 		switch (c) {
-		/* Ignore whitespace and comments */
+			/* Ignore whitespace and comments */
 
 		case '*':
 			if (!lexerState->atLineStart)
 				return T_OP_MUL;
 			warning(WARNING_OBSOLETE,
-				"'*' is deprecated for comments, please use ';' instead\n");
+			        "'*' is deprecated for comments, please use ';' instead\n");
 			/* fallthrough */
 		case ';':
 			discardComment();
@@ -1495,7 +1503,7 @@ static int yylex_NORMAL(void)
 		case '\t':
 			break;
 
-		/* Handle unambiguous single-char tokens */
+			/* Handle unambiguous single-char tokens */
 
 		case '^':
 			return T_OP_XOR;
@@ -1511,7 +1519,7 @@ static int yylex_NORMAL(void)
 			yylval.tzSym[1] = '\0';
 			return T_ID;
 
-		/* Handle accepted single chars */
+			/* Handle accepted single chars */
 
 		case '[':
 		case ']':
@@ -1521,8 +1529,8 @@ static int yylex_NORMAL(void)
 		case ':':
 			return c;
 
-		/* Handle ambiguous 1- or 2-char tokens */
-		char secondChar;
+			/* Handle ambiguous 1- or 2-char tokens */
+			char secondChar;
 		case '/': /* Either division or a block comment */
 			secondChar = peek(0);
 			if (secondChar == '*') {
@@ -1577,7 +1585,7 @@ static int yylex_NORMAL(void)
 			}
 			return T_OP_LOGICNOT;
 
-		/* Handle numbers */
+			/* Handle numbers */
 
 		case '$':
 			yylval.nConstValue = 0;
@@ -1644,13 +1652,13 @@ static int yylex_NORMAL(void)
 			readGfxConstant();
 			return T_NUMBER;
 
-		/* Handle strings */
+			/* Handle strings */
 
 		case '"':
 			readString();
 			return T_STRING;
 
-		/* Handle newlines and EOF */
+			/* Handle newlines and EOF */
 
 		case '\r':
 			return '\r';
@@ -1660,7 +1668,7 @@ static int yylex_NORMAL(void)
 		case EOF:
 			return 0;
 
-		/* Handle escapes */
+			/* Handle escapes */
 
 		case '\\':
 			c = peek(0);
@@ -1681,7 +1689,7 @@ static int yylex_NORMAL(void)
 			}
 			break;
 
-		/* Handle identifiers and escapes... or error out */
+			/* Handle identifiers and escapes... or error out */
 
 		default:
 			if (startsIdentifier(c)) {
@@ -1721,8 +1729,8 @@ static int yylex_NORMAL(void)
 
 static int yylex_RAW(void)
 {
-	dbgPrint("Lexing in raw mode, line=%" PRIu32 ", col=%" PRIu32 "\n",
-		 lexer_GetLineNo(), lexer_GetColNo());
+	dbgPrint("Lexing in raw mode, line=%" PRIu32 ", col=%" PRIu32 "\n", lexer_GetLineNo(),
+	         lexer_GetColNo());
 
 	/* This is essentially a modified `readString` */
 	size_t i = 0;
@@ -1807,7 +1815,7 @@ static int yylex_RAW(void)
 			}
 			continue; /* Do not copy an additional character */
 
-		/* Regular characters will just get copied */
+			/* Regular characters will just get copied */
 		}
 		if (i < sizeof(yylval.tzString)) /* Copy one extra to flag overflow */
 			yylval.tzString[i++] = c;
@@ -1922,12 +1930,10 @@ restart:
 		}
 	}
 
-	static int (* const lexerModeFuncs[])(void) = {
-		[LEXER_NORMAL]       = yylex_NORMAL,
-		[LEXER_RAW]          = yylex_RAW,
-		[LEXER_SKIP_TO_ELIF] = yylex_SKIP_TO_ELIF,
-		[LEXER_SKIP_TO_ENDC] = yylex_SKIP_TO_ENDC
-	};
+	static int (*const lexerModeFuncs[])(void) = {[LEXER_NORMAL] = yylex_NORMAL,
+	                                              [LEXER_RAW] = yylex_RAW,
+	                                              [LEXER_SKIP_TO_ELIF] = yylex_SKIP_TO_ELIF,
+	                                              [LEXER_SKIP_TO_ENDC] = yylex_SKIP_TO_ENDC};
 	int token = lexerModeFuncs[lexerState->mode]();
 
 	/* Make sure to terminate files with a line feed */

@@ -10,11 +10,13 @@
  * Outputs an objectfile
  */
 
+#include "asm/output.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,14 +24,11 @@
 #include "asm/charmap.h"
 #include "asm/fstack.h"
 #include "asm/main.h"
-#include "asm/output.h"
 #include "asm/rpn.h"
 #include "asm/section.h"
 #include "asm/symbol.h"
 #include "asm/warning.h"
-
 #include "extern/err.h"
-
 #include "linkdefs.h"
 #include "platform.h" // strdup
 
@@ -86,8 +85,7 @@ static uint32_t countpatches(struct Section const *sect)
 {
 	uint32_t r = 0;
 
-	for (struct Patch const *patch = sect->patches; patch != NULL;
-	     patch = patch->next)
+	for (struct Patch const *patch = sect->patches; patch != NULL; patch = patch->next)
 		r++;
 
 	return r;
@@ -140,7 +138,8 @@ void out_RegisterNode(struct FileStackNode *node)
 	while (node->ID == -1) {
 		node->ID = getNbFileStackNodes();
 		if (node->ID == -1)
-			fatalerror("Reached too many file stack nodes; try splitting the file up\n");
+			fatalerror(
+			    "Reached too many file stack nodes; try splitting the file up\n");
 		node->next = fileStackNodes;
 		fileStackNodes = node;
 
@@ -238,8 +237,7 @@ static void writesection(struct Section const *sect, FILE *f)
 		fwrite(sect->data, 1, sect->size, f);
 		fputlong(countpatches(sect), f);
 
-		for (struct Patch const *patch = sect->patches; patch != NULL;
-		     patch = patch->next)
+		for (struct Patch const *patch = sect->patches; patch != NULL; patch = patch->next)
 			writepatch(patch, f);
 	}
 }
@@ -270,7 +268,8 @@ static void registerSymbol(struct Symbol *sym)
 	out_RegisterNode(sym->src);
 	if (nbSymbols == -1)
 		fatalerror("Registered too many symbols (%" PRIu32
-			   "); try splitting up your files\n", (uint32_t)-1);
+		           "); try splitting up your files\n",
+		           (uint32_t)-1);
 	sym->ID = nbSymbols++;
 }
 
@@ -285,14 +284,13 @@ static uint32_t getSymbolID(struct Symbol *sym)
 	return sym->ID;
 }
 
-static void writerpn(uint8_t *rpnexpr, uint32_t *rpnptr, uint8_t *rpn,
-		     uint32_t rpnlen)
+static void writerpn(uint8_t *rpnexpr, uint32_t *rpnptr, uint8_t *rpn, uint32_t rpnlen)
 {
 	char tzSym[512];
 
-	for (size_t offset = 0; offset < rpnlen; ) {
+	for (size_t offset = 0; offset < rpnlen;) {
 #define popbyte() rpn[offset++]
-#define writebyte(byte)	rpnexpr[(*rpnptr)++] = byte
+#define writebyte(byte) rpnexpr[(*rpnptr)++] = byte
 		uint8_t rpndata = popbyte();
 
 		switch (rpndata) {
@@ -303,9 +301,8 @@ static void writerpn(uint8_t *rpnexpr, uint32_t *rpnptr, uint8_t *rpn,
 			writebyte(popbyte());
 			writebyte(popbyte());
 			break;
-		case RPN_SYM:
-		{
-			for (unsigned int i = -1; (tzSym[++i] = popbyte()); )
+		case RPN_SYM: {
+			for (unsigned int i = -1; (tzSym[++i] = popbyte());)
 				;
 			struct Symbol *sym = sym_FindSymbol(tzSym);
 			uint32_t value;
@@ -323,9 +320,8 @@ static void writerpn(uint8_t *rpnexpr, uint32_t *rpnptr, uint8_t *rpn,
 			writebyte(value >> 24);
 			break;
 		}
-		case RPN_BANK_SYM:
-		{
-			for (unsigned int i = -1; (tzSym[++i] = popbyte()); )
+		case RPN_BANK_SYM: {
+			for (unsigned int i = -1; (tzSym[++i] = popbyte());)
 				;
 			struct Symbol *sym = sym_FindSymbol(tzSym);
 			uint32_t value = getSymbolID(sym);
@@ -337,8 +333,7 @@ static void writerpn(uint8_t *rpnexpr, uint32_t *rpnptr, uint8_t *rpn,
 			writebyte(value >> 24);
 			break;
 		}
-		case RPN_BANK_SECT:
-		{
+		case RPN_BANK_SECT: {
 			uint8_t b;
 
 			writebyte(RPN_BANK_SECT);
@@ -414,8 +409,8 @@ void out_CreatePatch(uint32_t type, struct Expression const *expr, uint32_t ofs)
 /**
  * Creates an assert that will be written to the object file
  */
-bool out_CreateAssert(enum AssertionType type, struct Expression const *expr,
-		      char const *message, uint32_t ofs)
+bool out_CreateAssert(enum AssertionType type, struct Expression const *expr, char const *message,
+                      uint32_t ofs)
 {
 	struct Assertion *assertion = malloc(sizeof(*assertion));
 
@@ -453,7 +448,7 @@ static void writeFileStackNode(struct FileStackNode const *node, FILE *f)
 
 		fputlong(reptNode->reptDepth, f);
 		/* Iters are stored by decreasing depth, so reverse the order for output */
-		for (uint32_t i = reptNode->reptDepth; i--; )
+		for (uint32_t i = reptNode->reptDepth; i--;)
 			fputlong(reptNode->iters[i], f);
 	}
 }
@@ -490,8 +485,8 @@ void out_WriteObject(void)
 		writeFileStackNode(node, f);
 		if (node->next && node->next->ID != node->ID - 1)
 			fatalerror("Internal error: fstack node #%" PRIu32 " follows #%" PRIu32
-				   ". Please report this to the developers!\n",
-				   node->next->ID, node->ID);
+			           ". Please report this to the developers!\n",
+			           node->next->ID, node->ID);
 	}
 
 	for (struct Symbol const *sym = objectSymbols; sym; sym = sym->next)
@@ -501,8 +496,7 @@ void out_WriteObject(void)
 		writesection(sect, f);
 
 	fputlong(countasserts(), f);
-	for (struct Assertion *assert = assertions; assert;
-	     assert = assert->next)
+	for (struct Assertion *assert = assertions; assert; assert = assert->next)
 		writeassert(assert, f);
 
 	fclose(f);

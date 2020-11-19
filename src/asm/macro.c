@@ -1,4 +1,6 @@
 
+#include "asm/macro.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -7,7 +9,6 @@
 #include <string.h>
 
 #include "asm/asm.h"
-#include "asm/macro.h"
 #include "asm/warning.h"
 
 /*
@@ -25,8 +26,8 @@ struct MacroArgs {
 	char *args[];
 };
 
-#define SIZEOF_ARGS(nbArgs) (sizeof(struct MacroArgs) + \
-			    sizeof(((struct MacroArgs){0}).args[0]) * (nbArgs))
+#define SIZEOF_ARGS(nbArgs) \
+	(sizeof(struct MacroArgs) + sizeof(((struct MacroArgs){0}).args[0]) * (nbArgs))
 
 static struct MacroArgs *macroArgs = NULL;
 static uint32_t uniqueID = 0;
@@ -61,13 +62,13 @@ void macro_AppendArg(struct MacroArgs **argPtr, char *s)
 {
 #define macArgs (*argPtr)
 	if (macArgs->nbArgs == MAXMACROARGS)
-		error("A maximum of " EXPAND_AND_STR(MAXMACROARGS)
-		      " arguments is allowed\n");
+		error("A maximum of " EXPAND_AND_STR(MAXMACROARGS) " arguments is allowed\n");
 	if (macArgs->nbArgs >= macArgs->capacity) {
 		macArgs->capacity *= 2;
 		/* Check that overflow didn't roll us back */
 		if (macArgs->capacity <= macArgs->nbArgs)
-			fatalerror("Failed to add new macro argument: possible capacity overflow\n");
+			fatalerror(
+			    "Failed to add new macro argument: possible capacity overflow\n");
 		macArgs = realloc(macArgs, SIZEOF_ARGS(macArgs->capacity));
 		if (!macArgs)
 			fatalerror("Error adding new macro argument: %s\n", strerror(errno));
@@ -94,8 +95,7 @@ char const *macro_GetArg(uint32_t i)
 
 	uint32_t realIndex = i + macroArgs->shift - 1;
 
-	return realIndex >= macroArgs->nbArgs ? NULL
-					      : macroArgs->args[realIndex];
+	return realIndex >= macroArgs->nbArgs ? NULL : macroArgs->args[realIndex];
 }
 
 uint32_t macro_GetUniqueID(void)

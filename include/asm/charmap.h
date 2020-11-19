@@ -9,6 +9,7 @@
 #ifndef RGBDS_ASM_CHARMAP_H
 #define RGBDS_ASM_CHARMAP_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct Charmap *charmap_New(const char *name, const char *baseName);

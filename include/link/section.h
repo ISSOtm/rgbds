@@ -12,11 +12,10 @@
 
 /* GUIDELINE: external code MUST NOT BE AWARE of the data structure used!! */
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "link/main.h"
-
 #include "linkdefs.h"
 
 struct FileStackNode;

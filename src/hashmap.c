@@ -6,13 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <stdint.h>
+#include "hashmap.h"
+
+#include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
-#include "hashmap.h"
 #include "extern/err.h"
 
 /*
@@ -20,7 +21,7 @@
  * the upper half is used to help resolve collisions more quickly
  */
 #define UINT_BITS_(NB_BITS) uint##NB_BITS##_t
-#define UINT_BITS(NB_BITS)  UINT_BITS_(NB_BITS)
+#define UINT_BITS(NB_BITS) UINT_BITS_(NB_BITS)
 typedef UINT_BITS(HASH_NB_BITS) HashType;
 typedef UINT_BITS(HALF_HASH_NB_BITS) HalfHashType;
 
@@ -70,8 +71,7 @@ bool hash_ReplaceElement(HashMap const map, char const *key, void *element)
 	struct HashMapEntry *ptr = map[(HalfHashType)hashedKey];
 
 	while (ptr) {
-		if (hashedKey >> HALF_HASH_NB_BITS == ptr->hash
-		 && !strcmp(ptr->key, key)) {
+		if (hashedKey >> HALF_HASH_NB_BITS == ptr->hash && !strcmp(ptr->key, key)) {
 			ptr->content = element;
 			return true;
 		}
@@ -86,8 +86,7 @@ bool hash_RemoveElement(HashMap map, char const *key)
 	struct HashMapEntry **ptr = &map[(HalfHashType)hashedKey];
 
 	while (*ptr) {
-		if (hashedKey >> HALF_HASH_NB_BITS == (*ptr)->hash
-		 && !strcmp((*ptr)->key, key)) {
+		if (hashedKey >> HALF_HASH_NB_BITS == (*ptr)->hash && !strcmp((*ptr)->key, key)) {
 			struct HashMapEntry *next = (*ptr)->next;
 
 			free(*ptr);
@@ -105,10 +104,8 @@ void *hash_GetElement(HashMap const map, char const *key)
 	struct HashMapEntry *ptr = map[(HalfHashType)hashedKey];
 
 	while (ptr) {
-		if (hashedKey >> HALF_HASH_NB_BITS == ptr->hash
-		 && !strcmp(ptr->key, key)) {
+		if (hashedKey >> HALF_HASH_NB_BITS == ptr->hash && !strcmp(ptr->key, key))
 			return ptr->content;
-		}
 		ptr = ptr->next;
 	}
 	return NULL;

@@ -85,7 +85,7 @@ struct Mapfile {
 
 extern int depth, colors;
 
-#include "gfx/makepng.h"
 #include "gfx/gb.h"
+#include "gfx/makepng.h"
 
 #endif /* RGBDS_GFX_MAIN_H */

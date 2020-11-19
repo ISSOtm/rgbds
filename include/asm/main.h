@@ -50,7 +50,7 @@ void lowerstring(char *s);
 #define YY_FATAL_ERROR fatalerror
 
 #ifdef YYLMAX
-#undef YYLMAX
+	#undef YYLMAX
 #endif
 #define YYLMAX 65536
 

@@ -10,6 +10,8 @@
  * Controls RPN expressions for objectfiles
  */
 
+#include "asm/rpn.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -19,25 +21,25 @@
 
 #include "asm/asm.h"
 #include "asm/main.h"
-#include "asm/rpn.h"
 #include "asm/section.h"
 #include "asm/symbol.h"
 #include "asm/warning.h"
 
 /* Makes an expression "not known", also setting its error message */
-#define makeUnknown(expr_, ...) do { \
-	struct Expression *_expr = expr_; \
-	_expr->isKnown = false; \
-	/* If we had `asprintf` this would be great, but alas. */ \
-	_expr->reason = malloc(128); /* Use an initial reasonable size */ \
-	if (!_expr->reason) \
-		fatalerror("Can't allocate err string: %s\n", strerror(errno)); \
-	int size = snprintf(_expr->reason, 128, __VA_ARGS__); \
-	if (size >= 128) { /* If this wasn't enough, try again */ \
-		_expr->reason = realloc(_expr->reason, size + 1); \
-		sprintf(_expr->reason, __VA_ARGS__); \
-	} \
-} while (0)
+#define makeUnknown(expr_, ...)                                                         \
+	do {                                                                            \
+		struct Expression *_expr = expr_;                                       \
+		_expr->isKnown = false;                                                 \
+		/* If we had `asprintf` this would be great, but alas. */               \
+		_expr->reason = malloc(128); /* Use an initial reasonable size */       \
+		if (!_expr->reason)                                                     \
+			fatalerror("Can't allocate err string: %s\n", strerror(errno)); \
+		int size = snprintf(_expr->reason, 128, __VA_ARGS__);                   \
+		if (size >= 128) { /* If this wasn't enough, try again */               \
+			_expr->reason = realloc(_expr->reason, size + 1);               \
+			sprintf(_expr->reason, __VA_ARGS__);                            \
+		}                                                                       \
+	} while (0)
 
 static uint8_t *reserveSpace(struct Expression *expr, uint32_t size)
 {
@@ -52,8 +54,8 @@ static uint8_t *reserveSpace(struct Expression *expr, uint32_t size)
 				 * To avoid generating humongous object files, cap the
 				 * size of RPN expressions
 				 */
-				fatalerror("RPN expression cannot grow larger than "
-					   EXPAND_AND_STR(MAXRPNLEN) " bytes\n");
+				fatalerror("RPN expression cannot grow larger than " EXPAND_AND_STR(
+				    MAXRPNLEN) " bytes\n");
 			else if (expr->nRPNCapacity > MAXRPNLEN / 2)
 				expr->nRPNCapacity = MAXRPNLEN;
 			else
@@ -116,8 +118,10 @@ void rpn_Symbol(struct Expression *expr, char *tzSym)
 		expr->isSymbol = true;
 
 		sym_Ref(tzSym);
-		makeUnknown(expr, sym_IsPC(sym) ? "PC is not constant at assembly time"
-						: "'%s' is not constant at assembly time", tzSym);
+		makeUnknown(expr,
+		            sym_IsPC(sym) ? "PC is not constant at assembly time"
+		                          : "'%s' is not constant at assembly time",
+		            tzSym);
 		expr->nRPNPatchSize += 5; /* 1-byte opcode + 4-byte symbol ID */
 
 		size_t nameLen = strlen(tzSym) + 1; /* Don't forget NUL! */
@@ -198,8 +202,7 @@ void rpn_BankSection(struct Expression *expr, char const *tzSectionName)
 	if (pSection && pSection->bank != -1) {
 		expr->nVal = pSection->bank;
 	} else {
-		makeUnknown(expr, "Section \"%s\"'s bank is not known",
-			    tzSectionName);
+		makeUnknown(expr, "Section \"%s\"'s bank is not known", tzSectionName);
 
 		size_t nameLen = strlen(tzSectionName) + 1; /* Room for NUL! */
 		uint8_t *ptr = reserveSpace(expr, nameLen + 1);
@@ -260,8 +263,8 @@ static int32_t shift(int32_t shiftee, int32_t amount)
 	if (amount >= 0) {
 		// Left shift
 		if (amount >= 32) {
-			warning(WARNING_SHIFT_AMOUNT, "Shifting left by large amount %"
-				PRId32 "\n", amount);
+			warning(WARNING_SHIFT_AMOUNT, "Shifting left by large amount %" PRId32 "\n",
+			        amount);
 			return 0;
 
 		} else {
@@ -277,7 +280,7 @@ static int32_t shift(int32_t shiftee, int32_t amount)
 		amount = -amount;
 		if (amount >= 32) {
 			warning(WARNING_SHIFT_AMOUNT,
-				"Shifting right by large amount %" PRId32 "\n", amount);
+			        "Shifting right by large amount %" PRId32 "\n", amount);
 			return shiftee < 0 ? -1 : 0;
 
 		} else if (shiftee >= 0) {
@@ -288,8 +291,7 @@ static int32_t shift(int32_t shiftee, int32_t amount)
 			 * The C standard leaves shifting right negative values
 			 * undefined, so use a left shift manually sign-extended
 			 */
-			return (uint32_t)shiftee >> amount
-				| -(UINT32_C(1) << (32 - amount));
+			return (uint32_t)shiftee >> amount | -(UINT32_C(1) << (32 - amount));
 		}
 	}
 }
@@ -314,14 +316,13 @@ bool rpn_IsDiffConstant(struct Expression const *src, struct Symbol const *sym)
 	return section1 && (section1 == section2);
 }
 
-static bool isDiffConstant(struct Expression const *src1,
-			   struct Expression const *src2)
+static bool isDiffConstant(struct Expression const *src1, struct Expression const *src2)
 {
 	return rpn_IsDiffConstant(src1, rpn_SymbolOf(src2));
 }
 
-void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr,
-		  const struct Expression *src1, const struct Expression *src2)
+void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr, const struct Expression *src1,
+                  const struct Expression *src2)
 {
 	expr->isSymbol = false;
 
@@ -376,20 +377,20 @@ void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr,
 		case RPN_SHL:
 			if (src2->nVal < 0)
 				warning(WARNING_SHIFT_AMOUNT,
-					"Shifting left by negative amount %" PRId32 "\n",
-					src2->nVal);
+				        "Shifting left by negative amount %" PRId32 "\n",
+				        src2->nVal);
 
 			expr->nVal = shift(src1->nVal, src2->nVal);
 			break;
 		case RPN_SHR:
 			if (src1->nVal < 0)
 				warning(WARNING_SHIFT, "Shifting negative value %" PRId32 "\n",
-					src1->nVal);
+				        src1->nVal);
 
 			if (src2->nVal < 0)
 				warning(WARNING_SHIFT_AMOUNT,
-					"Shifting right by negative amount %" PRId32 "\n",
-					src2->nVal);
+				        "Shifting right by negative amount %" PRId32 "\n",
+				        src2->nVal);
 
 			expr->nVal = shift(src1->nVal, -src2->nVal);
 			break;
@@ -401,8 +402,9 @@ void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr,
 				fatalerror("Division by zero\n");
 
 			if (src1->nVal == INT32_MIN && src2->nVal == -1) {
-				warning(WARNING_DIV, "Division of %" PRId32 " by -1 yields %"
-					PRId32 "\n", INT32_MIN, INT32_MIN);
+				warning(WARNING_DIV,
+				        "Division of %" PRId32 " by -1 yields %" PRId32 "\n",
+				        INT32_MIN, INT32_MIN);
 				expr->nVal = INT32_MIN;
 			} else {
 				expr->nVal = src1->nVal / src2->nVal;
@@ -443,14 +445,12 @@ void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr,
 		/* Convert the left-hand expression if it's constant */
 		if (src1->isKnown) {
 			uint32_t lval = src1->nVal;
-			uint8_t bytes[] = {RPN_CONST, lval, lval >> 8,
-					   lval >> 16, lval >> 24};
+			uint8_t bytes[] = {RPN_CONST, lval, lval >> 8, lval >> 16, lval >> 24};
 			expr->nRPNPatchSize = sizeof(bytes);
 			expr->tRPN = NULL;
 			expr->nRPNCapacity = 0;
 			expr->nRPNLength = 0;
-			memcpy(reserveSpace(expr, sizeof(bytes)), bytes,
-			       sizeof(bytes));
+			memcpy(reserveSpace(expr, sizeof(bytes)), bytes, sizeof(bytes));
 
 			/* Use the other expression's un-const reason */
 			expr->reason = src2->reason;
@@ -466,14 +466,13 @@ void rpn_BinaryOp(enum RPNCommand op, struct Expression *expr,
 		}
 
 		/* Now, merge the right expression into the left one */
-		uint8_t *ptr = src2->tRPN; /* Pointer to the right RPN */
+		uint8_t *ptr = src2->tRPN;       /* Pointer to the right RPN */
 		uint32_t len = src2->nRPNLength; /* Size of the right RPN */
 		uint32_t patchSize = src2->nRPNPatchSize;
 
 		/* If the right expression is constant, merge a shim instead */
 		uint32_t rval = src2->nVal;
-		uint8_t bytes[] = {RPN_CONST, rval, rval >> 8, rval >> 16,
-				   rval >> 24};
+		uint8_t bytes[] = {RPN_CONST, rval, rval >> 8, rval >> 16, rval >> 24};
 		if (src2->isKnown) {
 			ptr = bytes;
 			len = sizeof(bytes);
@@ -498,8 +497,8 @@ void rpn_HIGH(struct Expression *expr, const struct Expression *src)
 	if (rpn_isKnown(expr)) {
 		expr->nVal = (uint32_t)expr->nVal >> 8 & 0xFF;
 	} else {
-		uint8_t bytes[] = {RPN_CONST,    8, 0, 0, 0, RPN_SHR,
-				   RPN_CONST, 0xFF, 0, 0, 0, RPN_AND};
+		uint8_t bytes[] = {RPN_CONST, 8,    0, 0, 0, RPN_SHR,
+		                   RPN_CONST, 0xFF, 0, 0, 0, RPN_AND};
 		expr->nRPNPatchSize += sizeof(bytes);
 		memcpy(reserveSpace(expr, sizeof(bytes)), bytes, sizeof(bytes));
 	}

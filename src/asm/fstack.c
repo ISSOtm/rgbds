@@ -6,7 +6,10 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "asm/fstack.h"
+
 #include <sys/stat.h>
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -14,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "asm/fstack.h"
 #include "asm/macro.h"
 #include "asm/main.h"
 #include "asm/symbol.h"
@@ -22,9 +24,9 @@
 #include "platform.h" /* S_ISDIR (stat macro) */
 
 #ifdef LEXER_DEBUG
-  #define dbgPrint(...) fprintf(stderr, "[lexer] " __VA_ARGS__)
+	#define dbgPrint(...) fprintf(stderr, "[lexer] " __VA_ARGS__)
 #else
-  #define dbgPrint(...)
+	#define dbgPrint(...)
 #endif
 
 struct Context {
@@ -54,7 +56,7 @@ char const *dumpNodeAndParents(struct FileStackNode const *node)
 
 		name = dumpNodeAndParents(node->parent);
 		fprintf(stderr, "(%" PRIu32 ") -> %s", node->lineNo, name);
-		for (uint32_t i = reptInfo->reptDepth; i--; )
+		for (uint32_t i = reptInfo->reptDepth; i--;)
 			fprintf(stderr, "::REPT~%" PRIu32, reptInfo->iters[i]);
 	} else {
 		name = ((struct FileStackNamedNode const *)node)->name;
@@ -158,8 +160,7 @@ bool fstk_FindFile(char const *path, char **fullPath, size_t *size)
 		*size = 64; /* This is arbitrary, really */
 		*fullPath = realloc(*fullPath, *size);
 		if (!*fullPath)
-			error("realloc error during include path search: %s\n",
-			      strerror(errno));
+			error("realloc error during include path search: %s\n", strerror(errno));
 	}
 
 	if (*fullPath) {
@@ -197,16 +198,20 @@ bool fstk_FindFile(char const *path, char **fullPath, size_t *size)
 
 bool yywrap(void)
 {
-	if (contextStack->fileInfo->type == NODE_REPT) { /* The context is a REPT block, which may loop */
-		struct FileStackReptNode *fileInfo = (struct FileStackReptNode *)contextStack->fileInfo;
+	if (contextStack->fileInfo->type
+	    == NODE_REPT) { /* The context is a REPT block, which may loop */
+		struct FileStackReptNode *fileInfo =
+		    (struct FileStackReptNode *)contextStack->fileInfo;
 
 		/* If the node is referenced, we can't edit it; duplicate it */
 		if (contextStack->fileInfo->referenced) {
-			size_t size = sizeof(*fileInfo) + sizeof(fileInfo->iters[0]) * fileInfo->reptDepth;
+			size_t size =
+			    sizeof(*fileInfo) + sizeof(fileInfo->iters[0]) * fileInfo->reptDepth;
 			struct FileStackReptNode *copy = malloc(size);
 
 			if (!copy)
-				fatalerror("Failed to duplicate REPT file node: %s\n", strerror(errno));
+				fatalerror("Failed to duplicate REPT file node: %s\n",
+				           strerror(errno));
 			/* Copy all info but the referencing */
 			memcpy(copy, fileInfo, size);
 			copy->node.next = NULL;
@@ -273,7 +278,6 @@ static void newContext(struct FileStackNode *fileInfo)
 	 */
 	context->parent = contextStack;
 	contextStack = context;
-
 }
 
 void fstk_RunInclude(char const *path)
@@ -346,8 +350,8 @@ void fstk_RunMacro(char const *macroName, struct MacroArgs *args)
 	struct FileStackNamedNode const *baseNode = (struct FileStackNamedNode const *)node;
 	size_t baseLen = strlen(baseNode->name);
 	size_t macroNameLen = strlen(macro->name);
-	struct FileStackNamedNode *fileInfo = malloc(sizeof(*fileInfo) + baseLen
-						     + reptNameLen + 2 + macroNameLen + 1);
+	struct FileStackNamedNode *fileInfo =
+	    malloc(sizeof(*fileInfo) + baseLen + reptNameLen + 2 + macroNameLen + 1);
 
 	if (!fileInfo) {
 		error("Failed to alloc file info for \"%s\": %s\n", macro->name, strerror(errno));
@@ -362,12 +366,12 @@ void fstk_RunMacro(char const *macroName, struct MacroArgs *args)
 	if (node->type == NODE_REPT) {
 		struct FileStackReptNode const *reptNode = (struct FileStackReptNode const *)node;
 
-		for (uint32_t i = reptNode->reptDepth; i--; ) {
+		for (uint32_t i = reptNode->reptDepth; i--;) {
 			int nbChars = sprintf(dest, "::REPT~%" PRIu32, reptNode->iters[i]);
 
 			if (nbChars < 0)
 				fatalerror("Failed to write macro invocation info: %s\n",
-					   strerror(errno));
+				           strerror(errno));
 			dest += nbChars;
 		}
 	}
@@ -377,8 +381,8 @@ void fstk_RunMacro(char const *macroName, struct MacroArgs *args)
 
 	newContext((struct FileStackNode *)fileInfo);
 	/* Line minus 1 because buffer begins with a newline */
-	contextStack->lexerState = lexer_OpenFileView(macro->macro, macro->macroSize,
-						      macro->fileLine - 1);
+	contextStack->lexerState =
+	    lexer_OpenFileView(macro->macro, macro->macroSize, macro->fileLine - 1);
 	if (!contextStack->lexerState)
 		fatalerror("Failed to set up lexer for macro invocation\n");
 	lexer_SetStateAtEOL(contextStack->lexerState);
@@ -393,10 +397,10 @@ void fstk_RunRept(uint32_t count, int32_t reptLineNo, char *body, size_t size)
 		return;
 
 	uint32_t reptDepth = contextStack->fileInfo->type == NODE_REPT
-				? ((struct FileStackReptNode *)contextStack->fileInfo)->reptDepth
-				: 0;
-	struct FileStackReptNode *fileInfo = malloc(sizeof(*fileInfo)
-						    + (reptDepth + 1) * sizeof(fileInfo->iters[0]));
+			       ? ((struct FileStackReptNode *)contextStack->fileInfo)->reptDepth
+			       : 0;
+	struct FileStackReptNode *fileInfo =
+	    malloc(sizeof(*fileInfo) + (reptDepth + 1) * sizeof(fileInfo->iters[0]));
 
 	if (!fileInfo) {
 		error("Failed to alloc file info for REPT: %s\n", strerror(errno));
@@ -421,7 +425,6 @@ void fstk_RunRept(uint32_t count, int32_t reptLineNo, char *body, size_t size)
 	lexer_SetStateAtEOL(contextStack->lexerState);
 	contextStack->uniqueID = macro_UseNewUniqueID();
 	contextStack->nbReptIters = count;
-
 }
 
 void fstk_Init(char const *mainPath, size_t maxRecursionDepth)
@@ -463,8 +466,9 @@ void fstk_Init(char const *mainPath, size_t maxRecursionDepth)
 	 */
 #define DEPTH_LIMIT ((SIZE_MAX - sizeof(struct FileStackReptNode)) / sizeof(uint32_t))
 	if (maxRecursionDepth > DEPTH_LIMIT) {
-		error("Recursion depth may not be higher than %zu, defaulting to "
-		      EXPAND_AND_STR(DEFAULT_MAX_DEPTH) "\n", DEPTH_LIMIT);
+		error("Recursion depth may not be higher than %zu, defaulting to " EXPAND_AND_STR(
+			  DEFAULT_MAX_DEPTH) "\n",
+		      DEPTH_LIMIT);
 		nMaxRecursionDepth = DEFAULT_MAX_DEPTH;
 	} else {
 		nMaxRecursionDepth = maxRecursionDepth;

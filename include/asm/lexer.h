@@ -9,7 +9,7 @@
 #ifndef RGBDS_ASM_LEXER_H
 #define RGBDS_ASM_LEXER_H
 
-#define MAXSTRLEN	255
+#define MAXSTRLEN 255
 
 struct LexerState;
 extern struct LexerState *lexerState;
@@ -52,7 +52,8 @@ void lexer_RestartRept(uint32_t lineNo);
 void lexer_DeleteState(struct LexerState *state);
 void lexer_Init(void);
 
-enum LexerMode {
+enum LexerMode
+{
 	LEXER_NORMAL,
 	LEXER_RAW,
 	LEXER_SKIP_TO_ELIF,

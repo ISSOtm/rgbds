@@ -6,11 +6,11 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "gfx/gb.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "gfx/gb.h"
 
 void transpose_tiles(struct GBImage *gb, int width)
 {
@@ -24,9 +24,7 @@ void transpose_tiles(struct GBImage *gb, int width)
 
 	for (i = 0; i < gb->size; i++) {
 		newbyte = i / (8 * depth) * width * 8 * depth;
-		newbyte = newbyte % gb->size
-			+ 8 * depth * (newbyte / gb->size)
-			+ i % (8 * depth);
+		newbyte = newbyte % gb->size + 8 * depth * (newbyte / gb->size) + i % (8 * depth);
 		newdata[newbyte] = gb->data[i];
 	}
 
@@ -45,12 +43,10 @@ void raw_to_gb(const struct RawIndexedImage *raw_image, struct GBImage *gb)
 			index = raw_image->data[y][x];
 			index &= (1 << depth) - 1;
 
-			byte = y * depth
-				+ x / 8 * raw_image->height / 8 * 8 * depth;
+			byte = y * depth + x / 8 * raw_image->height / 8 * 8 * depth;
 			gb->data[byte] |= (index & 1) << (7 - x % 8);
 			if (depth == 2) {
-				gb->data[byte + 1] |=
-					(index >> 1) << (7 - x % 8);
+				gb->data[byte + 1] |= (index >> 1) << (7 - x % 8);
 			}
 		}
 	}
@@ -65,8 +61,7 @@ void output_file(const struct Options *opts, const struct GBImage *gb)
 
 	f = fopen(opts->outfile, "wb");
 	if (!f)
-		err(1, "%s: Opening output file '%s' failed", __func__,
-		    opts->outfile);
+		err(1, "%s: Opening output file '%s' failed", __func__, opts->outfile);
 
 	fwrite(gb->data, 1, gb->size - gb->trim * 8 * depth, f);
 
@@ -126,8 +121,8 @@ void yflip(uint8_t *tile, uint8_t *tile_yflip, int tile_size)
  * `*flags` is set according to the type of mirroring and the index of the
  * matched tile is returned. If no match is found, -1 is returned.
  */
-int get_mirrored_tile_index(uint8_t *tile, uint8_t **tiles, int num_tiles,
-			    int tile_size, int *flags)
+int get_mirrored_tile_index(uint8_t *tile, uint8_t **tiles, int num_tiles, int tile_size,
+                            int *flags)
 {
 	int index;
 	uint8_t *tile_xflip;
@@ -141,8 +136,7 @@ int get_mirrored_tile_index(uint8_t *tile, uint8_t **tiles, int num_tiles,
 
 	tile_yflip = malloc(tile_size);
 	if (!tile_yflip)
-		err(1, "%s: Failed to allocate memory for Y flip of tile",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for Y flip of tile", __func__);
 	yflip(tile, tile_yflip, tile_size);
 	index = get_tile_index(tile_yflip, tiles, num_tiles, tile_size);
 	if (index >= 0) {
@@ -153,8 +147,7 @@ int get_mirrored_tile_index(uint8_t *tile, uint8_t **tiles, int num_tiles,
 
 	tile_xflip = malloc(tile_size);
 	if (!tile_xflip)
-		err(1, "%s: Failed to allocate memory for X flip of tile",
-		    __func__);
+		err(1, "%s: Failed to allocate memory for X flip of tile", __func__);
 	xflip(tile, tile_xflip, tile_size);
 	index = get_tile_index(tile_xflip, tiles, num_tiles, tile_size);
 	if (index >= 0) {
@@ -174,8 +167,8 @@ int get_mirrored_tile_index(uint8_t *tile, uint8_t **tiles, int num_tiles,
 	return index;
 }
 
-void create_mapfiles(const struct Options *opts, struct GBImage *gb,
-		     struct Mapfile *tilemap, struct Mapfile *attrmap)
+void create_mapfiles(const struct Options *opts, struct GBImage *gb, struct Mapfile *tilemap,
+                     struct Mapfile *attrmap)
 {
 	int i, j;
 	int gb_i;
@@ -204,16 +197,14 @@ void create_mapfiles(const struct Options *opts, struct GBImage *gb,
 	if (*opts->tilemapfile) {
 		tilemap->data = calloc(max_tiles, sizeof(*tilemap->data));
 		if (!tilemap->data)
-			err(1, "%s: Failed to allocate memory for tilemap data",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for tilemap data", __func__);
 		tilemap->size = 0;
 	}
 
 	if (*opts->attrmapfile) {
 		attrmap->data = calloc(max_tiles, sizeof(*attrmap->data));
 		if (!attrmap->data)
-			err(1, "%s: Failed to allocate memory for attrmap data",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for attrmap data", __func__);
 		attrmap->size = 0;
 	}
 
@@ -222,21 +213,17 @@ void create_mapfiles(const struct Options *opts, struct GBImage *gb,
 		flags = 0;
 		tile = malloc(tile_size);
 		if (!tile)
-			err(1, "%s: Failed to allocate memory for tile",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for tile", __func__);
 		for (i = 0; i < tile_size; i++) {
 			tile[i] = gb->data[gb_i];
 			gb_i++;
 		}
 		if (opts->unique) {
 			if (opts->mirror) {
-				index = get_mirrored_tile_index(tile, tiles,
-								num_tiles,
-								tile_size,
-								&flags);
+				index = get_mirrored_tile_index(tile, tiles, num_tiles, tile_size,
+				                                &flags);
 			} else {
-				index = get_tile_index(tile, tiles, num_tiles,
-						       tile_size);
+				index = get_tile_index(tile, tiles, num_tiles, tile_size);
 			}
 
 			if (index < 0) {
@@ -265,8 +252,7 @@ void create_mapfiles(const struct Options *opts, struct GBImage *gb,
 		free(gb->data);
 		gb->data = malloc(tile_size * num_tiles);
 		if (!gb->data)
-			err(1, "%s: Failed to allocate memory for tile data",
-			    __func__);
+			err(1, "%s: Failed to allocate memory for tile data", __func__);
 		for (i = 0; i < num_tiles; i++) {
 			tile = tiles[i];
 			for (j = 0; j < tile_size; j++)
@@ -281,15 +267,13 @@ void create_mapfiles(const struct Options *opts, struct GBImage *gb,
 	free(tiles);
 }
 
-void output_tilemap_file(const struct Options *opts,
-			 const struct Mapfile *tilemap)
+void output_tilemap_file(const struct Options *opts, const struct Mapfile *tilemap)
 {
 	FILE *f;
 
 	f = fopen(opts->tilemapfile, "wb");
 	if (!f)
-		err(1, "%s: Opening tilemap file '%s' failed", __func__,
-		    opts->tilemapfile);
+		err(1, "%s: Opening tilemap file '%s' failed", __func__, opts->tilemapfile);
 
 	fwrite(tilemap->data, 1, tilemap->size, f);
 	fclose(f);
@@ -298,15 +282,13 @@ void output_tilemap_file(const struct Options *opts,
 		free(opts->tilemapfile);
 }
 
-void output_attrmap_file(const struct Options *opts,
-			 const struct Mapfile *attrmap)
+void output_attrmap_file(const struct Options *opts, const struct Mapfile *attrmap)
 {
 	FILE *f;
 
 	f = fopen(opts->attrmapfile, "wb");
 	if (!f)
-		err(1, "%s: Opening attrmap file '%s' failed", __func__,
-		    opts->attrmapfile);
+		err(1, "%s: Opening attrmap file '%s' failed", __func__, opts->attrmapfile);
 
 	fwrite(attrmap->data, 1, attrmap->size, f);
 	fclose(f);
@@ -321,26 +303,20 @@ void output_attrmap_file(const struct Options *opts,
  * with ties resolved by comparing the difference of the squares.
  */
 static int reverse_curve[] = {
-	0,  0,  1,  1,  2,  2,  3,  3,  3,  3,  4,  4,  4,  4,  4,  4,
-	5,  5,  5,  5,  5,  5,  6,  6,  6,  6,  6,  6,  6,  6,  7,  7,
-	7,  7,  7,  7,  7,  7,  7,  8,  8,  8,  8,  8,  8,  8,  8,  8,
-	9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  10, 10, 10, 10, 10, 10,
-	10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
-	12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13,
-	13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14,
-	14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17,
-	17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18,
-	18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-	19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21,
-	21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22,
-	22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24,
-	24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26,
-	26, 27, 27, 27, 27, 27, 28, 28, 28, 28, 29, 29, 29, 30, 30, 31,
+    0,  0,  1,  1,  2,  2,  3,  3,  3,  3,  4,  4,  4,  4,  4,  4,  5,  5,  5,  5,  5,  5,  6,  6,
+    6,  6,  6,  6,  6,  6,  7,  7,  7,  7,  7,  7,  7,  7,  7,  8,  8,  8,  8,  8,  8,  8,  8,  8,
+    9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11,
+    11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13,
+    13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17,
+    17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19,
+    19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21,
+    21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26,
+    26, 27, 27, 27, 27, 27, 28, 28, 28, 28, 29, 29, 29, 30, 30, 31,
 };
 
-void output_palette_file(const struct Options *opts,
-			 const struct RawIndexedImage *raw_image)
+void output_palette_file(const struct Options *opts, const struct RawIndexedImage *raw_image)
 {
 	FILE *f;
 	int i, color;
@@ -348,8 +324,7 @@ void output_palette_file(const struct Options *opts,
 
 	f = fopen(opts->palfile, "wb");
 	if (!f)
-		err(1, "%s: Opening palette file '%s' failed", __func__,
-		    opts->palfile);
+		err(1, "%s: Opening palette file '%s' failed", __func__, opts->palfile);
 
 	for (i = 0; i < raw_image->num_colors; i++) {
 		int r = raw_image->palette[i].red;
