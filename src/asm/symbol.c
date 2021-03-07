@@ -25,6 +25,7 @@
 #include "asm/main.h"
 #include "asm/output.h"
 #include "asm/section.h"
+#include "asm/string.h"
 #include "asm/symbol.h"
 #include "asm/util.h"
 #include "asm/warning.h"
@@ -90,43 +91,28 @@ static int32_t Callback__LINE__(void)
 	return lexer_GetLineNo();
 }
 
-static char const *Callback__FILE__(void)
+static struct String *Callback__FILE__(void)
 {
-	/*
-	 * FIXME: this is dangerous, and here's why this is CURRENTLY okay. It's still bad, fix it.
-	 * There are only two call sites for this; one copies the contents directly, the other is
-	 * EQUS expansions, which cannot straddle file boundaries. So this should be fine.
-	 */
-	static char *buf = NULL;
-	static size_t bufsize = 0;
+	struct String *str = str_New(0);
 	char const *fileName = fstk_GetFileName();
-	size_t j = 1;
 
-	/* TODO: is there a way for a file name to be empty? */
-	assert(fileName[0]);
+	str = str_Push(str, '"');
+	if (!str)
+		return str;
 	/* The assertion above ensures the loop runs at least once */
-	for (size_t i = 0; fileName[i]; i++, j++) {
-		/* Account for the extra backslash inserted below */
-		if (fileName[i] == '"')
-			j++;
-		/* Ensure there will be enough room; DO NOT PRINT ANYTHING ABOVE THIS!! */
-		if (j + 2 >= bufsize) { /* Always keep room for 2 tail chars */
-			bufsize = bufsize ? bufsize * 2 : 64;
-			buf = realloc(buf, bufsize);
-			if (!buf)
-				fatalerror("Failed to grow buffer for file name: %s\n",
-					   strerror(errno));
-		}
+	for (size_t i = 0; fileName[i]; i++) {
 		/* Escape quotes, since we're returning a string */
-		if (fileName[i] == '"')
-			buf[j - 1] = '\\';
-		buf[j] = fileName[i];
+		if (fileName[i] == '"') {
+			str = str_Push(str, '\\');
+			if (!str)
+				return str;
+		}
+		str = str_Push(str, fileName[i]);
+		if (!str)
+			return str;
 	}
-	/* Write everything after the loop, to ensure the buffer has been allocated */
-	buf[0] = '"';
-	buf[j++] = '"';
-	buf[j] = '\0';
-	return buf;
+	str = str_Push(str, '"');
+	return str;
 }
 
 static int32_t CallbackPC(void)
@@ -186,17 +172,16 @@ static void updateSymbolFilename(struct Symbol *sym)
 
 /*
  * Create a new symbol by name
+ * @param symName The symbol's name, taken ownership of
  */
-static struct Symbol *createsymbol(char const *s)
+static struct Symbol *createsymbol(struct String *symName)
 {
 	struct Symbol *symbol = malloc(sizeof(*symbol));
 
 	if (!symbol)
 		fatalerror("Failed to create symbol '%s': %s\n", s, strerror(errno));
 
-	if (snprintf(symbol->name, MAXSYMLEN + 1, "%s", s) > MAXSYMLEN)
-		warning(WARNING_LONG_STR, "Symbol name is too long: '%s'\n", s);
-
+	symbol->name = symName;
 	symbol->isExported = false;
 	symbol->isBuiltin = false;
 	symbol->hasCallback = false;
@@ -296,7 +281,7 @@ void sym_Purge(char const *symName)
 	} else {
 		/* Do not keep a reference to the label's name after purging it */
 		if (symbol->name == labelScope)
-			labelScope = NULL;
+			sym_SetCurrentSymbolScope(NULL);
 
 		/*
 		 * FIXME: this leaks symbol->macro for SYM_EQUS and SYM_MACRO, but this can't
@@ -340,7 +325,7 @@ uint32_t sym_GetConstantSymValue(struct Symbol const *sym)
 /*
  * Return a constant symbol's value
  */
-uint32_t sym_GetConstantValue(char const *s)
+uint32_t sym_GetConstantValue(char const *symName)
 {
 	struct Symbol const *sym = sym_FindScopedSymbol(s);
 
@@ -369,7 +354,7 @@ void sym_SetCurrentSymbolScope(char const *newScope)
  * @param symbolName The name of the symbol to create
  * @param numeric If false, the symbol may not have been referenced earlier
  */
-static struct Symbol *createNonrelocSymbol(char const *symbolName, bool numeric)
+static struct Symbol *createNonrelocSymbol(struct String *symbolName, bool numeric)
 {
 	struct Symbol *symbol = sym_FindExactSymbol(symbolName);
 
@@ -452,9 +437,9 @@ struct Symbol *sym_RedefString(char const *symName, char const *value)
 }
 
 /*
- * Alter a SET symbols value
+ * Alter a SET symbol's value
  */
-struct Symbol *sym_AddSet(char const *symName, int32_t value)
+struct Symbol *sym_AddSet(struct String *symName, int32_t value)
 {
 	struct Symbol *sym = sym_FindExactSymbol(symName);
 
@@ -559,7 +544,7 @@ struct Symbol *sym_AddLabel(char const *name)
 
 	/* Set the symbol as the new scope */
 	if (sym)
-		labelScope = sym->name;
+		sym_SetCurrentSymbolScope(sym->name);
 	return sym;
 }
 
@@ -574,17 +559,26 @@ struct Symbol *sym_AddAnonLabel(void)
 		error("Only %" PRIu32 " anonymous labels can be created!", anonLabelID);
 		return NULL;
 	}
-	char name[MAXSYMLEN + 1];
 
-	sym_WriteAnonLabelName(name, 0, true); // The direction is important!!
+	struct String *name = sym_WriteAnonLabelName(name, 0, true); // The direction is important!!
+
+	if (!name)
+		fatalerror("Failed to write anonymous label name: %s\n", strerror(errno));
 	anonLabelID++;
 	return addLabel(name);
+}
+
+static char tohexDigit(uint8_t nibble)
+{
+	if (nibble < 10)
+		return nibble + '0';
+	return nibble - 10 + 'a';
 }
 
 /*
  * Write an anonymous label's name to a buffer
  */
-void sym_WriteAnonLabelName(char buf[MIN_NB_ELMS(MAXSYMLEN + 1)], uint32_t ofs, bool neg)
+struct String *sym_WriteAnonLabelName(uint32_t ofs, bool neg)
 {
 	uint32_t id = 0;
 
@@ -604,7 +598,20 @@ void sym_WriteAnonLabelName(char buf[MIN_NB_ELMS(MAXSYMLEN + 1)], uint32_t ofs, 
 			id = anonLabelID + ofs;
 	}
 
-	sprintf(buf, "!%u", id);
+	struct String *name = str_New(9);
+
+	if (name) {
+		// Begin the name with a character normally illegal in symbol names
+		// That way, anonymous label *cannot* be referenced directly
+		name = str_Push(name, '!');
+		assert(name);
+		for (int shift = 28; shift >= 0; shift -= 4) {
+			name = str_Push(name, tohexDigit(id >> shift & 0xF));
+			assert(name);
+		}
+#undef push
+	}
+	return name;
 }
 
 /*
@@ -768,7 +775,7 @@ void sym_Init(time_t now)
 	addString("__UTC_SECOND__", removeLeadingZeros(savedSECOND));
 #undef addString
 
-	labelScope = NULL;
+	sym_SetCurrentSymbolScope(NULL);
 	anonLabelID = 0;
 
 	/* _PI is deprecated */

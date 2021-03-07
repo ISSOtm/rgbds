@@ -286,10 +286,12 @@ static void strfmt(char *dest, size_t destLen, char const *fmt, size_t nbArgs, s
 		struct StrFmtArg *arg = &args[a++];
 		static char buf[MAXSTRLEN + 1];
 
-		if (arg->isNumeric)
+		if (arg->isNumeric) {
 			fmt_PrintNumber(buf, sizeof(buf), &spec, arg->number);
-		else
+		} else {
 			fmt_PrintString(buf, sizeof(buf), &spec, arg->string);
+			str_Unref(arg->string);
+		}
 
 		i += snprintf(&dest[i], destLen - i, "%s", buf);
 	}
@@ -299,11 +301,6 @@ static void strfmt(char *dest, size_t destLen, char const *fmt, size_t nbArgs, s
 	else if (a > nbArgs)
 		error("STRFMT: Not enough arguments for format spec, got: %zu, need: %zu\n", nbArgs, a);
 
-	if (i > destLen - 1) {
-		warning(WARNING_LONG_STR, "STRFMT: String too long, got truncated\n");
-		i = destLen - 1;
-	}
-	dest[i] = '\0';
 }
 
 static void initDsArgList(struct DsArgList *args)
@@ -405,8 +402,8 @@ enum {
 
 %union
 {
-	char tzSym[MAXSYMLEN + 1];
-	char tzString[MAXSTRLEN + 1];
+	struct String *symName;
+	struct String *string;
 	struct Expression sVal;
 	int32_t nConstValue;
 	enum SectionModifier sectMod;
@@ -435,8 +432,8 @@ enum {
 %type	<sVal>		reloc_16bit_no_str
 %type	<nConstValue>	sectiontype
 
-%type	<tzString>	string
-%type	<tzString>	strcat_args
+%type	<string>	string
+%type	<string>	strcat_args
 %type	<strfmtArgs>	strfmt_args
 %type	<strfmtArgs>	strfmt_va_args
 
@@ -444,7 +441,7 @@ enum {
 %type	<sectSpec>	sectattrs
 
 %token	<nConstValue>	T_NUMBER "number"
-%token	<tzString>	T_STRING "string"
+%token	<string>	T_STRING "string"
 
 %token	T_PERIOD "."
 %token	T_COMMA ","
@@ -500,12 +497,12 @@ enum {
 %token	T_OP_STRRPL "STRRPL"
 %token	T_OP_STRFMT "STRFMT"
 
-%token	<tzSym> T_LABEL "label"
-%token	<tzSym> T_ID "identifier"
-%token	<tzSym> T_LOCAL_ID "local identifier"
-%token	<tzSym> T_ANON "anonymous label"
-%type	<tzSym> scoped_id
-%type	<tzSym> scoped_anon_id
+%token	<symName> T_LABEL "label"
+%token	<symName> T_ID "identifier"
+%token	<symName> T_LOCAL_ID "local identifier"
+%token	<symName> T_ANON "anonymous label"
+%type	<symName> scoped_id
+%type	<symName> scoped_anon_id
 %token	T_POP_EQU "EQU"
 %token	T_POP_SET "SET"
 %token	T_POP_EQUAL "="
@@ -1474,7 +1471,7 @@ strfmt_va_args	: %empty {
 		| strfmt_va_args T_COMMA string {
 			size_t i = nextStrFmtArgListIndex(&$1);
 
-			$1.args[i].string = strdup($3);
+			$1.args[i].string = $3; // Take ownership of the string
 			$1.args[i].isNumeric = false;
 			$$ = $1;
 		}

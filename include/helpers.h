@@ -18,6 +18,12 @@
 #ifdef __GNUC__ // GCC or compatible
 	#define format_(archetype, str_index, first_arg) \
 		__attribute__ ((format (archetype, str_index, first_arg)))
+	// Notes that a function allocates something
+	#define mallocish_ __attribute__ ((malloc))
+	// Notes that a function does not have any side effects (more or less)
+	#define pure_ __attribute__ ((pure))
+	// Notes that a function's return value should not be ignored
+	#define warn_unused_result_ __attribute__ ((warn_unused_result))
 	// In release builds, define "unreachable" as such, but trap in debug builds
 	#ifdef NDEBUG
 		#define unreachable_	__builtin_unreachable
@@ -27,6 +33,9 @@
 #else
 	// Unsupported, but no need to throw a fit
 	#define format_(archetype, str_index, first_arg)
+	#define mallocish_
+	#define pure_
+	#define warn_unused_result_
 	// This seems to generate similar code to __builtin_unreachable, despite different semantics
 	// Note that executing this is undefined behavior (declared _Noreturn, but does return)
 	static inline _Noreturn unreachable_(void) {}

@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <assert.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
@@ -15,6 +16,7 @@
 #include <string.h>
 
 #include "asm/format.h"
+#include "asm/string.h"
 #include "asm/warning.h"
 
 struct FormatSpec fmt_NewSpec(void)
@@ -132,7 +134,7 @@ void fmt_FinishCharacters(struct FormatSpec *fmt)
 		fmt->state = FORMAT_INVALID;
 }
 
-void fmt_PrintString(char *buf, size_t bufLen, struct FormatSpec const *fmt, char const *value)
+struct String *fmt_PrintString(struct FormatSpec const *fmt, struct String const *value)
 {
 	if (fmt->sign)
 		error("Formatting string with sign flag '%c'\n", fmt->sign);
@@ -145,29 +147,35 @@ void fmt_PrintString(char *buf, size_t bufLen, struct FormatSpec const *fmt, cha
 	if (fmt->type != 's')
 		error("Formatting string as type '%c'\n", fmt->type);
 
-	size_t len = strlen(value);
-	size_t totalLen = fmt->width > len ? fmt->width : len;
+	int len = str_Len(value);
+	int totalLen = fmt->width > len ? fmt->width : len;
+	struct String *str = str_New(totalLen);
 
-	if (totalLen + 1 > bufLen) /* bufLen includes terminator */
-		error("Formatted string value too long\n");
+	if (!str)
+		return NULL;
 
-	size_t padLen = fmt->width > len ? fmt->width - len : 0;
+	int padLen = fmt->width > len ? fmt->width - len : 0;
 
 	if (fmt->alignLeft) {
-		strncpy(buf, value, len < bufLen ? len : bufLen);
-		for (size_t i = 0; i < totalLen && len + i < bufLen; i++)
-			buf[len + i] = ' ';
+		str = str_Append(str, value);
+		assert(str); // This shouldn't cause a reallocation
+		for (int i = 0; i < padLen; i++) {
+			str = str_Push(str, ' ');
+			assert(str); // This shouldn't cause a reallocation either
+		}
 	} else {
-		for (size_t i = 0; i < padLen && i < bufLen; i++)
-			buf[i] = ' ';
-		if (bufLen > padLen)
-			strncpy(buf + padLen, value, bufLen - padLen - 1);
+		for (int i = 0; i < padLen; i++) {
+			str = str_Push(str, ' ');
+			assert(str); // This shouldn't cause a reallocation
+		}
+		str = str_Append(str, value);
+		assert(str); // This shouldn't cause a reallocation either
 	}
 
-	buf[totalLen] = '\0';
+	return str;
 }
 
-void fmt_PrintNumber(char *buf, size_t bufLen, struct FormatSpec const *fmt, uint32_t value)
+struct String *fmt_PrintNumber(struct FormatSpec const *fmt, uint32_t value)
 {
 	if (fmt->type != 'X' && fmt->type != 'x' && fmt->type != 'b' && fmt->type != 'o'
 	    && fmt->prefix)
@@ -209,9 +217,9 @@ void fmt_PrintNumber(char *buf, size_t bufLen, struct FormatSpec const *fmt, uin
 		*ptr = '\0';
 
 		/* Reverse the digits */
-		size_t valueLen = ptr - valueBuf;
+		int valueLen = ptr - valueBuf;
 
-		for (size_t i = 0, j = valueLen - 1; i < j; i++, j--) {
+		for (int i = 0, j = valueLen - 1; i < j; i++, j--) {
 			char c = valueBuf[i];
 
 			valueBuf[i] = valueBuf[j];
@@ -243,57 +251,67 @@ void fmt_PrintNumber(char *buf, size_t bufLen, struct FormatSpec const *fmt, uin
 		snprintf(valueBuf, sizeof(valueBuf), spec, value);
 	}
 
-	size_t len = strlen(valueBuf);
-	size_t numLen = len;
+	int len = strlen(valueBuf);
+	int numLen = len;
 
 	if (sign)
 		numLen++;
 	if (prefix)
 		numLen++;
 
-	size_t totalLen = fmt->width > numLen ? fmt->width : numLen;
+	int totalLen = fmt->width > numLen ? fmt->width : numLen;
+	int padLen = totalLen - numLen;
+	struct String *str = str_New(totalLen);
 
-	if (totalLen + 1 > bufLen) /* bufLen includes terminator */
-		error("Formatted numeric value too long\n");
+	if (!str)
+		return NULL;
 
-	size_t padLen = fmt->width > numLen ? fmt->width - numLen : 0;
+	// All `assert(str)` below are because reallocations shouldn't occur, having reserved
+	// the exact size up-front. They're here to catch programmer mistakes.
+	// TODO: Ideally, those should check that `str` was *not* modified!
 
 	if (fmt->alignLeft) {
-		size_t pos = 0;
-
-		if (sign && pos < bufLen)
-			buf[pos++] = sign;
-		if (prefix && pos < bufLen)
-			buf[pos++] = prefix;
-
-		strcpy(buf + pos, valueBuf);
-		pos += len;
-
-		for (size_t i = 0; i < totalLen && pos + i < bufLen; i++)
-			buf[pos + i] = ' ';
-	} else {
-		size_t pos = 0;
-
-		if (fmt->padZero) {
-			/* sign, then prefix, then zero padding */
-			if (sign && pos < bufLen)
-				buf[pos++] = sign;
-			if (prefix && pos < bufLen)
-				buf[pos++] = prefix;
-			for (size_t i = 0; i < padLen && pos < bufLen; i++)
-				buf[pos++] = '0';
-		} else {
-			/* space padding, then sign, then prefix */
-			for (size_t i = 0; i < padLen && pos < bufLen; i++)
-				buf[pos++] = ' ';
-			if (sign && pos < bufLen)
-				buf[pos++] = sign;
-			if (prefix && pos < bufLen)
-				buf[pos++] = prefix;
+		if (sign) {
+			str = str_Push(str, sign);
+			assert(str);
 		}
-		if (bufLen > pos)
-			strcpy(buf + pos, valueBuf);
+		if (prefix) {
+			str = str_Push(str, prefix);
+			assert(str);
+		}
+
+		str = str_AppendSlice(str, valueBuf, len);
+		assert(str);
+
+		for (int i = 0; i < padLen; i++) {
+			str = str_Push(str, ' ');
+			assert(str);
+		}
+
+	} else {
+		if (!fmt->padZero) {
+			for (int i = 0; i < padLen; i++) {
+				str = str_Push(str, ' ');
+				assert(str);
+			}
+		}
+		if (sign) {
+			str = str_Push(str, sign);
+			assert(str);
+		}
+		if (prefix) {
+			str = str_Push(str, prefix);
+			assert(str);
+		}
+		if (fmt->padZero) {
+			for (int i = 0; i < padLen; i++) {
+				str = str_Push(str, '0');
+				assert(str);
+			}
+		}
+		str = str_AppendSlice(str, valueBuf, len);
+		assert(str);
 	}
 
-	buf[totalLen] = '\0';
+	return str;
 }
