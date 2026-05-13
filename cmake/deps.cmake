@@ -10,8 +10,8 @@ FetchContent_Declare(PNG
 
 set(PNG_TESTS OFF CACHE INTERNAL "") # We do not care for these two (and they can even cause compile errors!)
 set(PNG_TOOLS OFF CACHE INTERNAL "")
-set(PNG_SHARED ON CACHE INTERNAL "") # Upstream seems to favour the dynamic lib over the static one?
-set(PNG_STATIC OFF CACHE INTERNAL "")
+set(PNG_SHARED OFF CACHE INTERNAL "") # Upstream seems to favour the dynamic lib over the static one?
+set(PNG_STATIC ON CACHE INTERNAL "")
 
 FetchContent_Declare(ZLIB
                      URL https://www.zlib.net/zlib-1.3.2.tar.xz
@@ -21,5 +21,5 @@ FetchContent_Declare(ZLIB
 # We thus enforce 1.0.4, but note that the libpng source code mentions that "it may work with versions as old as zlib 0.95".
                      FIND_PACKAGE_ARGS 1.0.4)
 
-set(ZLIB_BUILD_SHARED ON CACHE INTERNAL "")
-set(ZLIB_BUILD_STATIC OFF CACHE INTERNAL "")
+set(ZLIB_BUILD_SHARED OFF CACHE INTERNAL "")
+set(ZLIB_BUILD_STATIC ON CACHE INTERNAL "")
