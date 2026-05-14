@@ -120,6 +120,8 @@ endif()
 include(FetchContent)
 include(cmake/deps.cmake)
 
+# Make sure to make zlib available before libpng,
+# otherwise the latter will attempt to `find_package` the former without going through `FetchContent`!
 if(NOT DEFINED ZLIB_BUILD_TESTING) # Unless overridden (e.g. in the cache), we don't care about zlib's tests.
   set(ZLIB_BUILD_TESTING OFF)
 endif()
