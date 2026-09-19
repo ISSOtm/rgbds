@@ -4,19 +4,20 @@
 
 #include "helpers.hpp"
 
-// We do not build `make develop` with `-fsanitize=leak` because macOS clang++ does not support it.
-// Instead, we enable ASan (`-fsanitize=address`) to check for memory leaks in all four programs.
 #ifdef __clang__
 	#if __has_feature(address_sanitizer) && !defined(__SANITIZE_ADDRESS__)
 		#define __SANITIZE_ADDRESS__
 	#endif
 #endif
-#if !defined(NDEBUG) && defined(__SANITIZE_ADDRESS__) && !defined(__APPLE__)
+#if !defined(NDEBUG) && defined(__SANITIZE_ADDRESS__)
 extern "C" {
 	char const *__asan_default_options(void) {
 		return ":check_initialization_order=1"
 		       ":detect_invalid_pointer_pairs=2"
+	// This is not supported on macOS.
+	#ifndef __APPLE__
 		       ":detect_leaks=1"
+	#endif
 		       ":detect_stack_use_after_return=1"
 		       // ":fast_unwind_on_malloc=0" // Enable this if ASan outputs bad backtraces
 		       ":print_legend=0"
@@ -40,10 +41,12 @@ char const *get_package_version_string() {
 	}
 	// Fallback if version string can't be obtained from Git
 #ifndef PACKAGE_VERSION_RC
-	return "v" EXPAND_AND_STR(PACKAGE_VERSION_MAJOR) "." EXPAND_AND_STR(PACKAGE_VERSION_MINOR
+	return "v" EXPAND_AND_STR(PACKAGE_VERSION_MAJOR) "." EXPAND_AND_STR(
+	    PACKAGE_VERSION_MINOR
 	) "." EXPAND_AND_STR(PACKAGE_VERSION_PATCH);
 #else
-	return "v" EXPAND_AND_STR(PACKAGE_VERSION_MAJOR) "." EXPAND_AND_STR(PACKAGE_VERSION_MINOR
+	return "v" EXPAND_AND_STR(PACKAGE_VERSION_MAJOR) "." EXPAND_AND_STR(
+	    PACKAGE_VERSION_MINOR
 	) "." EXPAND_AND_STR(PACKAGE_VERSION_PATCH) "-rc" EXPAND_AND_STR(PACKAGE_VERSION_RC);
 #endif
 }
